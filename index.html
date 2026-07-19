@@ -1081,12 +1081,7 @@
       speechRecognition: null,
       speechListening: false,
       microphonePermissionGranted: false,
-      microphonePermissionBusy: false,
-      aiRecorder: null,
-      aiRecorderStream: null,
-      aiRecorderChunks: [],
-      aiRecordTimer: 0,
-      aiRequestBusy: false
+      microphonePermissionBusy: false
     };
 
     const byId = id => document.getElementById(id);
@@ -2236,7 +2231,7 @@ apiRequest('bootstrap')
     }
 
     async function startSpeechPractice() {
-      if (state.speechListening || state.aiRequestBusy) {
+      if (state.speechListening) {
         stopSpeechPractice(true);
         return;
       }
@@ -2251,9 +2246,13 @@ apiRequest('bootstrap')
         return;
       }
 
-      if (!window.MediaRecorder) {
-        startBrowserSpeechFallback(target,
-          'อุปกรณ์นี้ยังไม่รองรับการอัดเสียงสำหรับ AI จึงเปลี่ยนไปใช้ระบบฟังเสียงของเบราว์เซอร์');
+      const Recognition =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
+
+      if (!Recognition) {
+        elements.speechResult.className = 'speech-result retry';
+        elements.speechResult.textContent =
+          'เบราว์เซอร์นี้ยังไม่รองรับการฟังเสียง กรุณาเปิดด้วย Chrome หรือ Safari เวอร์ชันล่าสุด';
         return;
       }
 
@@ -2263,205 +2262,27 @@ apiRequest('bootstrap')
       elements.speakContentButton.textContent = '🎤 กำลังขออนุญาต...';
       elements.speechResult.className = 'speech-result';
       elements.speechResult.textContent =
-        'กรุณากด “อนุญาต” เมื่อโทรศัพท์ถามขอใช้ไมโครโฟน';
+        'กรุณากด “อนุญาต” เมื่ออุปกรณ์ถามขอใช้ไมโครโฟน';
 
-      let stream;
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-            channelCount: 1
-          },
-          video: false
-        });
-        state.microphonePermissionGranted = true;
+        await requestMicrophonePermission();
       } catch (error) {
         console.error(error);
-        finishAiRecordingUi();
+        elements.speakContentButton.disabled = false;
+        elements.speakContentButton.textContent = '🎤 พูดตาม';
         elements.speechResult.className = 'speech-result retry';
         elements.speechResult.textContent =
-          (error && (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError'))
-            ? 'ไมโครโฟนถูกปฏิเสธ กรุณาเปิดสิทธิ์ไมโครโฟนในการตั้งค่า Safari แล้วลองอีกครั้ง'
+          (error && (error.name === 'NotAllowedError' ||
+                     error.name === 'PermissionDeniedError'))
+            ? 'ไมโครโฟนถูกปฏิเสธ กรุณาเปิดสิทธิ์ไมโครโฟนในการตั้งค่าเบราว์เซอร์แล้วลองอีกครั้ง'
             : ((error && error.message) || 'เปิดไมโครโฟนไม่สำเร็จ กรุณาลองอีกครั้ง');
-        return;
-      }
-
-      const mimeType = chooseRecorderMimeType();
-      let recorder;
-
-      try {
-        recorder = mimeType
-          ? new MediaRecorder(stream, { mimeType: mimeType, audioBitsPerSecond: 64000 })
-          : new MediaRecorder(stream);
-      } catch (error) {
-        stopMediaStream(stream);
-        console.error(error);
-        startBrowserSpeechFallback(target,
-          'เปิดระบบอัดเสียง AI ไม่สำเร็จ จึงเปลี่ยนไปใช้ระบบฟังเสียงของเบราว์เซอร์');
-        return;
-      }
-
-      state.aiRecorder = recorder;
-      state.aiRecorderStream = stream;
-      state.aiRecorderChunks = [];
-      state.speechListening = true;
-
-      recorder.ondataavailable = function(event) {
-        if (event.data && event.data.size > 0) {
-          state.aiRecorderChunks.push(event.data);
-        }
-      };
-
-      recorder.onerror = function(event) {
-        console.error('MediaRecorder error', event);
-        stopSpeechPractice(false);
-        elements.speechResult.className = 'speech-result retry';
-        elements.speechResult.textContent = 'อัดเสียงไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
         setBgmVolume(bgmLevel('scanner'), 350);
-      };
-
-      recorder.onstop = function() {
-        clearTimeout(state.aiRecordTimer);
-        state.aiRecordTimer = 0;
-        stopMediaStream(state.aiRecorderStream);
-        state.aiRecorderStream = null;
-        state.aiRecorder = null;
-        state.speechListening = false;
-
-        const chunks = state.aiRecorderChunks.slice();
-        state.aiRecorderChunks = [];
-
-        if (!chunks.length) {
-          finishAiRecordingUi();
-          elements.speechResult.className = 'speech-result retry';
-          elements.speechResult.textContent = 'ยังไม่ได้รับเสียง ลองพูดให้ใกล้ไมโครโฟนขึ้นอีกครั้ง';
-          return;
-        }
-
-        const actualType = recorder.mimeType || mimeType || 'audio/webm';
-        const blob = new Blob(chunks, { type: actualType });
-        sendAudioToAi(blob, target);
-      };
-
-      elements.speakContentButton.disabled = false;
-      elements.speakContentButton.textContent = '⏹ ส่งเสียงให้ AI';
-      elements.speechResult.className = 'speech-result';
-      elements.speechResult.textContent =
-        '🎤 AI กำลังฟัง… พูดคำว่า “' + target + '” (ประมาณ 3 วินาที)';
-
-      recorder.start(250);
-      state.aiRecordTimer = setTimeout(function() {
-        if (state.aiRecorder && state.aiRecorder.state === 'recording') {
-          state.aiRecorder.stop();
-        }
-      }, 3200);
-    }
-
-    function chooseRecorderMimeType() {
-      const candidates = [
-        'audio/mp4',
-        'audio/webm;codecs=opus',
-        'audio/webm',
-        'audio/ogg;codecs=opus'
-      ];
-
-      for (let i = 0; i < candidates.length; i += 1) {
-        if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(candidates[i])) {
-          return candidates[i];
-        }
-      }
-      return '';
-    }
-
-    function stopMediaStream(stream) {
-      if (!stream) return;
-      stream.getTracks().forEach(function(track) { track.stop(); });
-    }
-
-    function blobToBase64(blob) {
-      return new Promise(function(resolve, reject) {
-        const reader = new FileReader();
-        reader.onload = function() {
-          const value = String(reader.result || '');
-          resolve(value.split(',')[1] || '');
-        };
-        reader.onerror = function() {
-          reject(reader.error || new Error('อ่านไฟล์เสียงไม่สำเร็จ'));
-        };
-        reader.readAsDataURL(blob);
-      });
-    }
-
-    async function sendAudioToAi(blob, target) {
-      state.aiRequestBusy = true;
-      elements.speakContentButton.disabled = true;
-      elements.speakContentButton.textContent = '🤖 AI กำลังตรวจ...';
-      elements.speechResult.className = 'speech-result';
-      elements.speechResult.textContent = '🤖 กำลังส่งเสียงให้ AI ตรวจ กรุณารอสักครู่...';
-
-      try {
-        const audioBase64 = await blobToBase64(blob);
-        if (!audioBase64) throw new Error('ไฟล์เสียงว่างเปล่า');
-
-        const response = await fetch(API_URL, {
-          method: 'POST',
-          redirect: 'follow',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({
-            action: 'transcribeSpeech',
-            audioBase64: audioBase64,
-            mimeType: blob.type || 'audio/webm',
-            targetWord: target
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error('AI ตอบกลับผิดพลาด (' + response.status + ')');
-        }
-
-        const data = await response.json();
-        if (!data || !data.ok) {
-          throw new Error((data && data.message) || 'AI ตรวจเสียงไม่สำเร็จ');
-        }
-
-        const transcript = String(data.text || '').trim();
-        const best = findBestSpeechMatch(target, [transcript]);
-        showSpeechResult(target, best);
-      } catch (error) {
-        console.error('AI transcription failed', error);
-        state.aiRequestBusy = false;
-        startBrowserSpeechFallback(target,
-          'เชื่อมต่อ AI ไม่สำเร็จ จึงเปลี่ยนไปใช้ระบบฟังเสียงของเบราว์เซอร์');
-        return;
-      }
-
-      finishAiRecordingUi();
-    }
-
-    function finishAiRecordingUi() {
-      state.aiRequestBusy = false;
-      state.speechListening = false;
-      elements.speakContentButton.disabled = false;
-      elements.speakContentButton.textContent = '🎤 พูดอีกครั้ง';
-      setBgmVolume(bgmLevel('scanner'), 350);
-    }
-
-    function startBrowserSpeechFallback(target, reason) {
-      const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-      if (!Recognition) {
-        finishAiRecordingUi();
-        elements.speechResult.className = 'speech-result retry';
-        elements.speechResult.textContent = reason + ' แต่เบราว์เซอร์นี้ไม่รองรับระบบสำรอง';
         return;
       }
 
       const recognition = new Recognition();
       state.speechRecognition = recognition;
       state.speechListening = true;
-      state.aiRequestBusy = false;
 
       recognition.lang = 'en-US';
       recognition.interimResults = false;
@@ -2471,29 +2292,47 @@ apiRequest('bootstrap')
       elements.speakContentButton.disabled = false;
       elements.speakContentButton.textContent = '⏹ หยุดฟัง';
       elements.speechResult.className = 'speech-result';
-      elements.speechResult.textContent = reason + ' — พูดคำว่า “' + target + '”';
+      elements.speechResult.textContent =
+        '🎤 กำลังฟัง… พูดคำว่า “' + target + '”';
 
       recognition.onresult = function(event) {
         const alternatives = [];
         const result = event.results && event.results[0];
+
         if (result) {
           for (let i = 0; i < result.length; i += 1) {
             alternatives.push(result[i].transcript || '');
           }
         }
-        showSpeechResult(target, findBestSpeechMatch(target, alternatives));
+
+        showSpeechResult(
+          target,
+          findBestSpeechMatch(target, alternatives)
+        );
       };
 
       recognition.onerror = function(event) {
-        if (!event || event.error !== 'aborted') {
-          elements.speechResult.className = 'speech-result retry';
-          elements.speechResult.textContent = 'ระบบสำรองฟังเสียงไม่สำเร็จ กรุณาลองอีกครั้ง';
-        }
+        if (event && event.error === 'aborted') return;
+
+        const messages = {
+          'no-speech': 'ยังไม่ได้ยินเสียง ลองพูดให้ชัดและใกล้ไมโครโฟนขึ้น',
+          'audio-capture': 'ไม่พบไมโครโฟนหรือไมโครโฟนยังไม่พร้อม',
+          'not-allowed': 'ยังไม่ได้อนุญาตใช้ไมโครโฟน',
+          'network': 'ระบบฟังเสียงเชื่อมต่อเครือข่ายไม่สำเร็จ กรุณาลองอีกครั้ง'
+        };
+
+        elements.speechResult.className = 'speech-result retry';
+        elements.speechResult.textContent =
+          messages[event && event.error] ||
+          'ระบบฟังเสียงไม่สำเร็จ กรุณาลองอีกครั้ง';
       };
 
       recognition.onend = function() {
         state.speechRecognition = null;
-        finishAiRecordingUi();
+        state.speechListening = false;
+        elements.speakContentButton.disabled = false;
+        elements.speakContentButton.textContent = '🎤 พูดอีกครั้ง';
+        setBgmVolume(bgmLevel('scanner'), 350);
       };
 
       try {
@@ -2501,32 +2340,23 @@ apiRequest('bootstrap')
       } catch (error) {
         console.error(error);
         state.speechRecognition = null;
-        finishAiRecordingUi();
+        state.speechListening = false;
+        elements.speakContentButton.disabled = false;
+        elements.speakContentButton.textContent = '🎤 พูดตาม';
         elements.speechResult.className = 'speech-result retry';
-        elements.speechResult.textContent = 'ไมโครโฟนยังไม่พร้อม กรุณาลองอีกครั้ง';
+        elements.speechResult.textContent =
+          'ไมโครโฟนยังไม่พร้อม กรุณารอสักครู่แล้วลองอีกครั้ง';
+        setBgmVolume(bgmLevel('scanner'), 350);
       }
     }
 
     function stopSpeechPractice(restoreVolume) {
-      clearTimeout(state.aiRecordTimer);
-      state.aiRecordTimer = 0;
-
-      if (state.aiRecorder && state.aiRecorder.state !== 'inactive') {
-        try { state.aiRecorder.stop(); } catch (error) {}
-      }
-
-      stopMediaStream(state.aiRecorderStream);
-      state.aiRecorderStream = null;
-      state.aiRecorder = null;
-      state.aiRecorderChunks = [];
-
       if (state.speechRecognition) {
         try { state.speechRecognition.abort(); } catch (error) {}
       }
 
       state.speechRecognition = null;
       state.speechListening = false;
-      state.aiRequestBusy = false;
 
       if (elements.speakContentButton) {
         elements.speakContentButton.disabled = false;
