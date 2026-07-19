@@ -814,6 +814,28 @@
     .content-display { margin: 8px 0 18px; color: rgba(255,255,255,.82); font-size: 20px; }
     .content-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .content-actions button { min-height: 58px; border-radius: 18px; font-weight: 800; font-size: 18px; }
+    .speech-result {
+      min-height: 48px;
+      margin: 12px 0 0;
+      padding: 11px 14px;
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: 16px;
+      color: rgba(255,255,255,.86);
+      background: rgba(255,255,255,.06);
+      font-size: 17px;
+      font-weight: 700;
+      line-height: 1.45;
+    }
+    .speech-result.success {
+      color: #c9ffe0;
+      border-color: rgba(128,255,184,.42);
+      background: rgba(61,190,117,.14);
+    }
+    .speech-result.retry {
+      color: #fff0ad;
+      border-color: rgba(255,224,103,.42);
+      background: rgba(255,204,65,.12);
+    }
     .manual-box { display: none; position: absolute; left: 16px; right: 16px; bottom: max(24px, calc(env(safe-area-inset-bottom) + 14px)); z-index: 4; padding: 16px; border-radius: 20px; background: rgba(4,14,35,.94); }
     .manual-box.show { display: grid; gap: 10px; }
     .manual-box input { text-transform: uppercase; }
@@ -967,7 +989,11 @@
         <audio id="contentAudio" preload="auto"></audio>
         <div class="content-actions">
           <button class="main-button" id="playContentAudioButton" type="button">🔊 ฟังเสียง</button>
+          <button class="secondary-button" id="speakContentButton" type="button">🎤 พูดตาม</button>
           <button class="secondary-button" id="scanNextButton" type="button">📷 สแกนคำต่อไป</button>
+        </div>
+        <div class="speech-result" id="speechResult" role="status" aria-live="polite">
+          กด “พูดตาม” แล้วออกเสียงคำศัพท์
         </div>
       </div>
     </section>
@@ -1051,7 +1077,9 @@
       scannerBusy: false,
       jsQrLoadPromise: null,
       modelViewerLoadPromise: null,
-      contentAudioCache: {}
+      contentAudioCache: {},
+      speechRecognition: null,
+      speechListening: false
     };
 
     const byId = id => document.getElementById(id);
@@ -1065,7 +1093,12 @@
       fallbackUrl:
         'https://drive.usercontent.google.com/download?id=1SMOdbyT1jhIusWxGikjfoFJYsKVZE_bX&export=download&confirm=t',
       volume: 0.45,
-      prompt: null
+      targetVolume: 0.45,
+      prompt: null,
+      audioContext: null,
+      mediaSource: null,
+      gainNode: null,
+      volumeFrameId: 0
     };
 
     const elements = {
@@ -1113,6 +1146,8 @@
       contentDisplay: byId('contentDisplay'),
       contentAudio: byId('contentAudio'),
       playContentAudioButton: byId('playContentAudioButton'),
+      speakContentButton: byId('speakContentButton'),
+      speechResult: byId('speechResult'),
       scanNextButton: byId('scanNextButton')
     };
 
@@ -1144,6 +1179,7 @@
       elements.manualButton.addEventListener('click', toggleManualEntry);
       elements.manualSubmitButton.addEventListener('click', submitManualContentId);
       elements.playContentAudioButton.addEventListener('click', playCurrentContentAudio);
+      elements.speakContentButton.addEventListener('click', startSpeechPractice);
       elements.scanNextButton.addEventListener('click', scanNextContent);
       elements.manualContentId.addEventListener('keydown', function(event) {
         if (event.key === 'Enter') submitManualContentId();
@@ -1416,7 +1452,8 @@ apiRequest('bootstrap')
       if (!MUSIC.backgroundMusic) return;
 
       MUSIC.backgroundMusic.loop = true;
-      setBgmVolume(MUSIC.volume,400);
+      MUSIC.targetVolume = MUSIC.volume;
+      setBgmVolume(MUSIC.targetVolume, 400);
       MUSIC.backgroundMusic.preload = 'auto';
       MUSIC.backgroundMusic.muted = false;
       MUSIC.backgroundMusic.dataset.fileId = MUSIC.fileId;
@@ -1497,6 +1534,7 @@ apiRequest('bootstrap')
       const unlock = function() {
         MUSIC.musicUnlocked = true;
         showMusicPrompt('🔊 กำลังเปิดเสียง...');
+        ensureMobileBgmControl();
 
         prepareBackgroundMusicData();
         playOpeningMusic();
@@ -1533,7 +1571,8 @@ apiRequest('bootstrap')
       }
 
       MUSIC.backgroundMusic.muted = false;
-      MUSIC.backgroundMusic.volume = MUSIC.volume;
+      ensureMobileBgmControl();
+      applyBgmVolumeImmediately(MUSIC.targetVolume);
 
       const playPromise = MUSIC.backgroundMusic.play();
 
@@ -1555,6 +1594,7 @@ apiRequest('bootstrap')
     function reinstallMusicUnlock() {
       const retry = function() {
         MUSIC.musicUnlocked = true;
+        ensureMobileBgmControl();
         playOpeningMusic();
 
         document.removeEventListener('pointerdown', retry);
@@ -1573,19 +1613,113 @@ apiRequest('bootstrap')
     }
 
     
-    function setBgmVolume(target, duration) {
-      duration = duration || 500;
-      if (!MUSIC.backgroundMusic) return;
+    function ensureMobileBgmControl() {
       const audio = MUSIC.backgroundMusic;
-      const start = audio.volume;
-      const diff = target - start;
-      const startTime = performance.now();
-      function step(now){
-        const p = Math.min((now-startTime)/duration,1);
-        audio.volume = start + diff*p;
-        if(p<1) requestAnimationFrame(step);
+      if (!audio) return false;
+
+      const AudioContextClass =
+        window.AudioContext || window.webkitAudioContext;
+
+      if (!AudioContextClass) return false;
+
+      try {
+        if (!MUSIC.audioContext) {
+          MUSIC.audioContext = new AudioContextClass();
+        }
+
+        if (!MUSIC.mediaSource) {
+          MUSIC.mediaSource =
+            MUSIC.audioContext.createMediaElementSource(audio);
+          MUSIC.gainNode = MUSIC.audioContext.createGain();
+          MUSIC.mediaSource.connect(MUSIC.gainNode);
+          MUSIC.gainNode.connect(MUSIC.audioContext.destination);
+        }
+
+        if (MUSIC.audioContext.state === 'suspended') {
+          MUSIC.audioContext.resume().catch(function(error) {
+            console.warn('ปลุกระบบเสียงโทรศัพท์ไม่สำเร็จ', error);
+          });
+        }
+
+        return Boolean(MUSIC.gainNode);
+      } catch (error) {
+        console.warn('ใช้ตัวควบคุมเสียงโทรศัพท์แบบสำรอง', error);
+        return false;
       }
-      requestAnimationFrame(step);
+    }
+
+    function applyBgmVolumeImmediately(target) {
+      const safeTarget = Math.max(0, Math.min(1, Number(target) || 0));
+      const audio = MUSIC.backgroundMusic;
+      if (!audio) return;
+
+      // คุมทั้ง volume ปกติและ GainNode เพื่อให้ทำงานบน iPhone/iPad
+      audio.volume = safeTarget;
+
+      if (ensureMobileBgmControl() && MUSIC.gainNode) {
+        MUSIC.gainNode.gain.cancelScheduledValues(
+          MUSIC.audioContext.currentTime
+        );
+        MUSIC.gainNode.gain.setValueAtTime(
+          safeTarget,
+          MUSIC.audioContext.currentTime
+        );
+      }
+    }
+
+    function setBgmVolume(target, duration) {
+      const safeTarget = Math.max(0, Math.min(1, Number(target) || 0));
+      MUSIC.targetVolume = safeTarget;
+      duration = Math.max(0, Number(duration) || 0);
+
+      const audio = MUSIC.backgroundMusic;
+      if (!audio) return;
+
+      if (MUSIC.volumeFrameId) {
+        cancelAnimationFrame(MUSIC.volumeFrameId);
+        MUSIC.volumeFrameId = 0;
+      }
+
+      const hasGain = ensureMobileBgmControl();
+
+      // iOS Safari ควบคุมระดับเสียงด้วย Web Audio GainNode
+      if (hasGain && MUSIC.gainNode && MUSIC.audioContext) {
+        const now = MUSIC.audioContext.currentTime;
+        const gain = MUSIC.gainNode.gain;
+        const current = gain.value;
+
+        gain.cancelScheduledValues(now);
+        gain.setValueAtTime(current, now);
+        gain.linearRampToValueAtTime(
+          safeTarget,
+          now + Math.max(duration / 1000, 0.01)
+        );
+
+        // ตั้งค่า volume ไว้ด้วย เพื่อรองรับ PC และเบราว์เซอร์อื่น
+        audio.volume = safeTarget;
+        return;
+      }
+
+      // สำรองสำหรับเบราว์เซอร์ที่ไม่มี Web Audio
+      const startVolume = audio.volume;
+      const difference = safeTarget - startVolume;
+      const startedAt = performance.now();
+
+      function step(now) {
+        const progress = duration === 0
+          ? 1
+          : Math.min((now - startedAt) / duration, 1);
+
+        audio.volume = startVolume + difference * progress;
+
+        if (progress < 1) {
+          MUSIC.volumeFrameId = requestAnimationFrame(step);
+        } else {
+          MUSIC.volumeFrameId = 0;
+        }
+      }
+
+      MUSIC.volumeFrameId = requestAnimationFrame(step);
     }
 
     function createFireflies(count) {
@@ -1917,6 +2051,7 @@ apiRequest('bootstrap')
       }
 
       prepareContentAudio(content.audioUrl);
+      resetSpeechPractice();
       elements.contentModal.classList.add('show');
       elements.contentModal.setAttribute('aria-hidden', 'false');
     }
@@ -1942,6 +2077,13 @@ apiRequest('bootstrap')
       const fileId = audio.dataset.fileId || '';
       const fallbackUrl = audio.dataset.fallbackUrl || '';
 
+      audio.onended = function() {
+        setBgmVolume(0.20, 350);
+      };
+      audio.onerror = function() {
+        setBgmVolume(0.20, 350);
+      };
+
       elements.playContentAudioButton.disabled = true;
       elements.playContentAudioButton.textContent = '🔊 กำลังโหลดเสียง...';
 
@@ -1949,6 +2091,7 @@ apiRequest('bootstrap')
         if (!audio.src) {
           elements.playContentAudioButton.disabled = false;
           elements.playContentAudioButton.textContent = '⚠️ ยังไม่มีไฟล์เสียง';
+          setBgmVolume(0.20, 350);
           return;
         }
 
@@ -1965,6 +2108,7 @@ apiRequest('bootstrap')
               console.error(error);
               elements.playContentAudioButton.disabled = false;
               elements.playContentAudioButton.textContent = '🔊 โหลดแล้ว แตะอีกครั้งเพื่อฟัง';
+              setBgmVolume(0.20, 350);
             });
         } else {
           elements.playContentAudioButton.disabled = false;
@@ -2004,6 +2148,7 @@ apiRequest('bootstrap')
 
             elements.playContentAudioButton.disabled = false;
             elements.playContentAudioButton.textContent = '⚠️ เปิดเสียงไม่สำเร็จ';
+            setBgmVolume(0.20, 350);
           });
         return;
       }
@@ -2017,6 +2162,260 @@ apiRequest('bootstrap')
 
       elements.playContentAudioButton.disabled = false;
       elements.playContentAudioButton.textContent = '⚠️ ยังไม่มีไฟล์เสียง';
+      setBgmVolume(0.20, 350);
+    }
+
+
+    function resetSpeechPractice() {
+      stopSpeechPractice(false);
+      if (!elements.speechResult) return;
+      elements.speechResult.className = 'speech-result';
+      elements.speechResult.textContent = 'กด “พูดตาม” แล้วออกเสียงคำศัพท์';
+      elements.speakContentButton.disabled = false;
+      elements.speakContentButton.textContent = '🎤 พูดตาม';
+    }
+
+    function startSpeechPractice() {
+      if (state.speechListening) {
+        stopSpeechPractice(true);
+        return;
+      }
+
+      const Recognition =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
+
+      if (!Recognition) {
+        elements.speechResult.className = 'speech-result retry';
+        elements.speechResult.textContent =
+          'อุปกรณ์นี้ยังไม่รองรับการฟังเสียง กรุณาใช้ Safari หรือ Chrome เวอร์ชันล่าสุด';
+        return;
+      }
+
+      const target = String(
+        (state.currentContent && state.currentContent.word) || ''
+      ).trim();
+
+      if (!target) {
+        elements.speechResult.className = 'speech-result retry';
+        elements.speechResult.textContent = 'ยังไม่มีคำศัพท์สำหรับตรวจเสียง';
+        return;
+      }
+
+      elements.contentAudio.pause();
+      setBgmVolume(0, 250);
+
+      const recognition = new Recognition();
+      state.speechRecognition = recognition;
+      state.speechListening = true;
+
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      recognition.continuous = false;
+      recognition.maxAlternatives = 5;
+
+      elements.speakContentButton.disabled = false;
+      elements.speakContentButton.textContent = '⏹ หยุดฟัง';
+      elements.speechResult.className = 'speech-result';
+      elements.speechResult.textContent =
+        '🎤 กำลังฟัง… พูดคำว่า “' + target + '”';
+
+      recognition.onresult = function(event) {
+        const alternatives = [];
+        const result = event.results && event.results[0];
+
+        if (result) {
+          for (let i = 0; i < result.length; i += 1) {
+            alternatives.push(result[i].transcript || '');
+          }
+        }
+
+        const best = findBestSpeechMatch(target, alternatives);
+        showSpeechResult(target, best);
+      };
+
+      recognition.onerror = function(event) {
+        const error = event && event.error ? event.error : '';
+
+        if (error === 'not-allowed' || error === 'service-not-allowed') {
+          elements.speechResult.className = 'speech-result retry';
+          elements.speechResult.textContent =
+            'กรุณาอนุญาตใช้ไมโครโฟน แล้วกด “พูดตาม” อีกครั้ง';
+        } else if (error === 'no-speech') {
+          elements.speechResult.className = 'speech-result retry';
+          elements.speechResult.textContent =
+            'ยังไม่ได้ยินเสียง ลองพูดให้ใกล้ไมโครโฟนขึ้นอีกครั้ง';
+        } else if (error !== 'aborted') {
+          elements.speechResult.className = 'speech-result retry';
+          elements.speechResult.textContent =
+            'ฟังเสียงไม่สำเร็จ ลองกดพูดใหม่อีกครั้ง';
+        }
+      };
+
+      recognition.onend = function() {
+        state.speechListening = false;
+        state.speechRecognition = null;
+        elements.speakContentButton.disabled = false;
+        elements.speakContentButton.textContent = '🎤 พูดอีกครั้ง';
+        setBgmVolume(0.20, 350);
+      };
+
+      try {
+        recognition.start();
+      } catch (error) {
+        console.error(error);
+        state.speechListening = false;
+        state.speechRecognition = null;
+        elements.speakContentButton.textContent = '🎤 พูดตาม';
+        elements.speechResult.className = 'speech-result retry';
+        elements.speechResult.textContent =
+          'ไมโครโฟนยังไม่พร้อม กรุณาลองอีกครั้ง';
+        setBgmVolume(0.20, 350);
+      }
+    }
+
+    function stopSpeechPractice(restoreVolume) {
+      if (state.speechRecognition) {
+        try {
+          state.speechRecognition.abort();
+        } catch (error) {
+          // หยุดระบบฟังเสียงแล้ว
+        }
+      }
+
+      state.speechRecognition = null;
+      state.speechListening = false;
+
+      if (elements.speakContentButton) {
+        elements.speakContentButton.disabled = false;
+        elements.speakContentButton.textContent = '🎤 พูดตาม';
+      }
+
+      if (restoreVolume !== false) {
+        setBgmVolume(0.20, 350);
+      }
+    }
+
+    function normalizeSpeechText(value) {
+      return String(value || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s'-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function findBestSpeechMatch(target, alternatives) {
+      const normalizedTarget = normalizeSpeechText(target);
+      let best = {
+        transcript: '',
+        normalized: '',
+        similarity: 0,
+        matched: false
+      };
+
+      (alternatives || []).forEach(function(transcript) {
+        const normalized = normalizeSpeechText(transcript);
+        if (!normalized) return;
+
+        const words = normalized.split(' ');
+        const exact =
+          normalized === normalizedTarget ||
+          words.indexOf(normalizedTarget) !== -1;
+
+        const similarity = exact
+          ? 1
+          : speechSimilarity(normalizedTarget, normalized);
+
+        if (exact || similarity > best.similarity) {
+          best = {
+            transcript: transcript,
+            normalized: normalized,
+            similarity: similarity,
+            matched: exact || similarity >= 0.72
+          };
+        }
+      });
+
+      return best;
+    }
+
+    function speechSimilarity(target, heard) {
+      if (!target || !heard) return 0;
+
+      const heardWords = heard.split(' ');
+      let bestDistance = levenshteinDistance(target, heard);
+
+      heardWords.forEach(function(word) {
+        bestDistance = Math.min(
+          bestDistance,
+          levenshteinDistance(target, word)
+        );
+      });
+
+      return Math.max(
+        0,
+        1 - bestDistance / Math.max(target.length, 1)
+      );
+    }
+
+    function levenshteinDistance(a, b) {
+      const rows = a.length + 1;
+      const cols = b.length + 1;
+      const matrix = Array.from(
+        { length: rows },
+        function() { return Array(cols).fill(0); }
+      );
+
+      for (let i = 0; i < rows; i += 1) matrix[i][0] = i;
+      for (let j = 0; j < cols; j += 1) matrix[0][j] = j;
+
+      for (let i = 1; i < rows; i += 1) {
+        for (let j = 1; j < cols; j += 1) {
+          const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j - 1] + cost
+          );
+        }
+      }
+
+      return matrix[a.length][b.length];
+    }
+
+    function showSpeechResult(target, result) {
+      const heard = result.transcript || 'ไม่ได้ยินคำที่ชัดเจน';
+
+      if (result.matched) {
+        elements.speechResult.className = 'speech-result success';
+        elements.speechResult.textContent =
+          '⭐ เยี่ยมมาก! ได้ยินว่า “' + heard +
+          '” ตรงกับ “' + target + '”';
+        logSpeechActivity(target, heard, 'CORRECT');
+      } else {
+        elements.speechResult.className = 'speech-result retry';
+        elements.speechResult.textContent =
+          'ลองอีกครั้งนะ ได้ยินว่า “' + heard +
+          '” คำเป้าหมายคือ “' + target + '”';
+        logSpeechActivity(target, heard, 'TRY_AGAIN');
+      }
+    }
+
+    function logSpeechActivity(target, heard, result) {
+      const user = state.currentUser || {};
+      const content = state.currentContent || {};
+
+      apiRequest('logARActivity', {
+        displayName: user.displayName || '',
+        role: user.role || state.role || '',
+        contentId: content.id || '',
+        letter: content.letter || '',
+        word: target || content.word || '',
+        activityAction: 'SPEECH_' + result,
+        speechText: heard || '',
+        userAgent: navigator.userAgent
+      }).catch(function(error) {
+        console.warn('บันทึกผลการพูดไม่สำเร็จ', error);
+      });
     }
 
     function scanNextContent() {
@@ -2025,6 +2424,7 @@ apiRequest('bootstrap')
     }
 
     function closeContentModal() {
+      stopSpeechPractice(false);
       elements.contentAudio.pause();
       elements.contentModal.classList.remove('show');
       elements.contentModal.setAttribute('aria-hidden', 'true');
