@@ -1,0 +1,2002 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+
+
+  <style>
+    :root {
+      --panel: rgba(8, 20, 45, 0.78);
+      --panel-strong: rgba(5, 15, 35, 0.93);
+      --line: rgba(255, 255, 255, 0.20);
+      --gold-1: #fff3a6;
+      --gold-2: #ffd55f;
+      --gold-3: #e99b26;
+      --text: #ffffff;
+      --muted: rgba(255, 255, 255, 0.76);
+      --danger: #ffabb3;
+      --success: #b9ffd9;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html,
+    body {
+      width: 100%;
+      min-height: 100%;
+      margin: 0;
+      font-family: "Sarabun", system-ui, sans-serif;
+      color: var(--text);
+      background: #09162d;
+    }
+
+    body {
+      min-height: 100dvh;
+      overflow-x: hidden;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    button {
+      touch-action: manipulation;
+    }
+
+    .app {
+      position: relative;
+      min-height: 100dvh;
+      isolation: isolate;
+      overflow: hidden;
+      background: #09162d;
+    }
+
+    .wallpaper {
+      position: fixed;
+      inset: 0;
+      z-index: -4;
+      background-position: center;
+      background-size: cover;
+      background-repeat: no-repeat;
+      transform: scale(1.04);
+    }
+
+    .vignette {
+      position: fixed;
+      inset: 0;
+      z-index: -3;
+      pointer-events: none;
+      background:
+        linear-gradient(180deg, rgba(1, 7, 20, 0.12), rgba(1, 7, 20, 0.76)),
+        radial-gradient(circle at center, transparent 25%, rgba(0, 0, 0, 0.44));
+    }
+
+    .fireflies {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .firefly {
+      position: absolute;
+      bottom: -25px;
+      width: var(--size);
+      height: var(--size);
+      border-radius: 50%;
+      background: #ffe87c;
+      box-shadow:
+        0 0 10px #ffe05b,
+        0 0 25px #ffae2e;
+      opacity: 0;
+      animation: rise var(--duration) linear infinite;
+      animation-delay: var(--delay);
+    }
+
+    @keyframes rise {
+      0% {
+        transform: translate3d(0, 15px, 0) scale(0.45);
+        opacity: 0;
+      }
+
+      12% {
+        opacity: 0.95;
+      }
+
+      50% {
+        transform: translate3d(var(--drift-a), -48vh, 0) scale(1);
+      }
+
+      75% {
+        opacity: 0.85;
+      }
+
+      100% {
+        transform: translate3d(var(--drift-b), -110vh, 0) scale(0.55);
+        opacity: 0;
+      }
+    }
+.screen {
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding:
+        max(72px, calc(env(safe-area-inset-top) + 62px))
+        max(18px, env(safe-area-inset-right))
+        max(26px, calc(env(safe-area-inset-bottom) + 18px))
+        max(18px, env(safe-area-inset-left));
+    }
+
+    .card {
+      width: min(100%, 560px);
+      padding: clamp(22px, 5vw, 38px);
+      border: 1px solid var(--line);
+      border-radius: 32px;
+      background: linear-gradient(180deg, var(--panel), var(--panel-strong));
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.40);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      text-align: center;
+    }
+
+    .logo-wrap {
+      min-height: 125px;
+      display: grid;
+      place-items: center;
+    }
+
+    .logo {
+      display: none;
+      max-width: min(76%, 330px);
+      max-height: 175px;
+      object-fit: contain;
+      filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.28));
+    }
+
+    .logo.show {
+      display: block;
+    }
+
+    .placeholder {
+      width: 105px;
+      height: 105px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: rgba(255, 255, 255, 0.08);
+      font-size: 44px;
+    }
+
+    .placeholder.hidden {
+      display: none;
+    }
+
+    h1 {
+      margin: 8px 0 4px;
+      font-size: clamp(28px, 6vw, 46px);
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      text-shadow: 0 4px 18px rgba(0, 0, 0, 0.34);
+    }
+
+    .subtitle {
+      margin: 0 0 23px;
+      color: var(--gold-1);
+      font-size: clamp(16px, 3.8vw, 22px);
+      font-weight: 700;
+    }
+
+    .step-title {
+      margin: 0 0 16px;
+      color: var(--muted);
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .role-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .role-button {
+      min-height: 94px;
+      padding: 12px 7px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      color: #fff;
+      background: rgba(255, 255, 255, 0.08);
+      cursor: pointer;
+      transition: 160ms ease;
+    }
+
+    .role-button:active {
+      transform: scale(0.97);
+    }
+
+    .role-button.active {
+      color: #14203a;
+      border-color: #ffeda1;
+      background: linear-gradient(180deg, var(--gold-1), var(--gold-2));
+      box-shadow: 0 10px 30px rgba(255, 200, 70, 0.22);
+    }
+
+    .role-icon {
+      display: block;
+      margin-bottom: 7px;
+      font-size: 31px;
+      line-height: 1;
+    }
+
+    .role-name {
+      display: block;
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .panel-step {
+      display: none;
+    }
+
+    .panel-step.active {
+      display: block;
+      animation: fade-in 230ms ease;
+    }
+
+    @keyframes fade-in {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .form-area {
+      display: grid;
+      gap: 13px;
+      text-align: left;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+    }
+
+    .field.hidden {
+      display: none;
+    }
+
+    label {
+      padding-left: 4px;
+      color: rgba(255, 255, 255, 0.90);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    input {
+      width: 100%;
+      min-height: 55px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 17px;
+      outline: none;
+      padding: 0 17px;
+      color: #fff;
+      background: rgba(255, 255, 255, 0.10);
+      font-size: 17px;
+    }
+
+    input::placeholder {
+      color: rgba(255, 255, 255, 0.48);
+    }
+
+    input:focus {
+      border-color: #ffe070;
+      box-shadow: 0 0 0 4px rgba(255, 210, 75, 0.12);
+    }
+
+    .main-button,
+    .secondary-button {
+      width: 100%;
+      min-height: 59px;
+      border-radius: 19px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .main-button {
+      border: none;
+      color: #18223a;
+      background: linear-gradient(180deg, var(--gold-1), var(--gold-2) 58%, var(--gold-3));
+      box-shadow: 0 15px 34px rgba(255, 180, 45, 0.28);
+      font-size: 19px;
+    }
+
+    .main-button:disabled {
+      opacity: 0.70;
+      cursor: wait;
+    }
+
+    .secondary-button {
+      border: 1px solid var(--line);
+      color: #fff;
+      background: rgba(255, 255, 255, 0.08);
+      font-size: 16px;
+    }
+
+    .button-row {
+      display: grid;
+      grid-template-columns: 0.72fr 1.28fr;
+      gap: 10px;
+      margin-top: 2px;
+    }
+
+    .selected-role {
+      margin: 0 0 17px;
+      padding: 10px 14px;
+      border: 1px solid rgba(255, 232, 124, 0.35);
+      border-radius: 14px;
+      color: var(--gold-1);
+      background: rgba(255, 218, 83, 0.08);
+      font-weight: 700;
+    }
+
+    .message {
+      min-height: 23px;
+      margin-top: 10px;
+      color: var(--danger);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .message.success {
+      color: var(--success);
+    }
+
+    .developer {
+      margin: 14px 0 0;
+      color: rgba(255, 255, 255, 0.62);
+      font-size: 13px;
+    }
+
+    .loading {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: grid;
+      place-items: center;
+      background: #071326;
+      transition: 0.35s ease;
+    }
+
+    .loading.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .loader-orb {
+      width: 68px;
+      height: 68px;
+      margin: 0 auto 18px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fffbd1, #ffd759 40%, #dd8d25 72%);
+      box-shadow:
+        0 0 24px #ffe061,
+        0 0 80px rgba(255, 170, 45, 0.52);
+      animation: pulse 1.25s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      50% {
+        transform: scale(0.82);
+        opacity: 0.68;
+      }
+    }
+
+    .adventure-screen {
+      min-height: 100dvh;
+      display: none;
+      place-items: center;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .adventure-screen.show {
+      display: grid;
+    }
+
+    .adventure-card {
+      width: min(100%, 650px);
+      padding: 30px;
+      border: 1px solid var(--line);
+      border-radius: 30px;
+      background: var(--panel-strong);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.40);
+    }
+
+    .adventure-card h2 {
+      margin: 0 0 10px;
+      font-size: clamp(28px, 6vw, 42px);
+    }
+
+    .adventure-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 17px;
+      line-height: 1.70;
+    }
+
+    .hero-name {
+      color: var(--gold-1);
+      font-weight: 800;
+    }
+    /* iPad และแท็บเล็ต */
+    @media (max-width: 1024px) {
+      .screen {
+        padding:
+          max(66px, calc(env(safe-area-inset-top) + 56px))
+          max(24px, env(safe-area-inset-right))
+          max(30px, calc(env(safe-area-inset-bottom) + 22px))
+          max(24px, env(safe-area-inset-left));
+      }
+
+      .card {
+        width: min(100%, 690px);
+        padding: 38px 34px;
+      }
+
+      .logo-wrap {
+        min-height: 150px;
+      }
+
+      .logo {
+        max-width: min(82%, 390px);
+        max-height: 210px;
+      }
+
+      h1 {
+        font-size: clamp(38px, 6vw, 54px);
+      }
+
+      .subtitle {
+        margin-bottom: 30px;
+        font-size: clamp(22px, 3.4vw, 28px);
+      }
+
+      .step-title {
+        margin-bottom: 20px;
+        font-size: 22px;
+      }
+
+      .role-grid {
+        gap: 14px;
+        margin-bottom: 24px;
+      }
+
+      .role-button {
+        min-height: 124px;
+        padding: 17px 10px;
+        border-radius: 26px;
+      }
+
+      .role-icon {
+        margin-bottom: 10px;
+        font-size: 43px;
+      }
+
+      .role-name {
+        font-size: 21px;
+      }
+
+      label {
+        font-size: 19px;
+      }
+
+      input {
+        min-height: 67px;
+        border-radius: 20px;
+        padding: 0 20px;
+        font-size: 21px;
+      }
+
+      .main-button,
+      .secondary-button {
+        min-height: 70px;
+        border-radius: 22px;
+      }
+
+      .main-button {
+        font-size: 23px;
+      }
+
+      .secondary-button {
+        font-size: 20px;
+      }
+
+      .selected-role {
+        padding: 14px 17px;
+        font-size: 19px;
+      }
+
+      .message {
+        min-height: 28px;
+        font-size: 18px;
+      }
+
+      .developer {
+        margin-top: 18px;
+        font-size: 17px;
+      }
+
+      .adventure-card {
+        width: min(100%, 760px);
+        padding: 40px 34px;
+      }
+
+      .adventure-card h2 {
+        font-size: clamp(38px, 6vw, 52px);
+      }
+
+      .adventure-card p {
+        font-size: 22px;
+      }
+    }
+
+    /* โทรศัพท์แนวตั้งและหน้าจอเล็ก */
+    @media (max-width: 600px) {
+      .screen {
+        place-items: start center;
+        overflow-y: auto;
+        padding:
+          max(44px, calc(env(safe-area-inset-top) + 30px))
+          max(15px, env(safe-area-inset-right))
+          max(34px, calc(env(safe-area-inset-bottom) + 24px))
+          max(15px, env(safe-area-inset-left));
+      }
+
+      .card {
+        width: 100%;
+        padding: 26px 19px;
+        border-radius: 27px;
+      }
+
+      .logo-wrap {
+        min-height: 115px;
+      }
+
+      .logo {
+        max-width: min(88%, 310px);
+        max-height: 150px;
+      }
+
+      .placeholder {
+        width: 88px;
+        height: 88px;
+        border-radius: 23px;
+        font-size: 38px;
+      }
+
+      h1 {
+        margin-top: 5px;
+        font-size: clamp(31px, 9vw, 42px);
+        line-height: 1.12;
+      }
+
+      .subtitle {
+        margin-bottom: 24px;
+        font-size: clamp(19px, 5.3vw, 24px);
+        line-height: 1.35;
+      }
+
+      .step-title {
+        margin-bottom: 16px;
+        font-size: 20px;
+      }
+
+      .role-grid {
+        grid-template-columns: 1fr;
+        gap: 11px;
+        margin-bottom: 20px;
+      }
+
+      .role-button {
+        min-height: 72px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 15px;
+        padding: 12px 20px;
+        border-radius: 20px;
+        text-align: left;
+      }
+
+      .role-icon {
+        width: 46px;
+        flex: 0 0 46px;
+        margin: 0;
+        font-size: 36px;
+        text-align: center;
+      }
+
+      .role-name {
+        font-size: 21px;
+      }
+
+      .form-area {
+        gap: 16px;
+      }
+
+      .field {
+        gap: 9px;
+      }
+
+      label {
+        padding-left: 3px;
+        font-size: 18px;
+      }
+
+      input {
+        min-height: 62px;
+        border-radius: 18px;
+        padding: 0 17px;
+        font-size: 20px;
+      }
+
+      .main-button,
+      .secondary-button {
+        min-height: 64px;
+        border-radius: 19px;
+      }
+
+      .main-button {
+        font-size: 21px;
+      }
+
+      .secondary-button {
+        font-size: 18px;
+      }
+
+      .button-row {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      .selected-role {
+        margin-bottom: 18px;
+        padding: 13px 15px;
+        font-size: 18px;
+        line-height: 1.45;
+      }
+
+      .message {
+        min-height: 25px;
+        margin-top: 11px;
+        font-size: 17px;
+        line-height: 1.45;
+      }
+
+      .developer {
+        margin-top: 17px;
+        font-size: 16px;
+        line-height: 1.55;
+      }
+
+      .adventure-screen {
+        align-items: start;
+        overflow-y: auto;
+        padding:
+          max(42px, calc(env(safe-area-inset-top) + 28px))
+          max(15px, env(safe-area-inset-right))
+          max(30px, calc(env(safe-area-inset-bottom) + 20px))
+          max(15px, env(safe-area-inset-left));
+      }
+
+      .adventure-card {
+        width: 100%;
+        padding: 28px 20px;
+        border-radius: 27px;
+      }
+
+      .adventure-card h2 {
+        font-size: clamp(31px, 9vw, 42px);
+        line-height: 1.18;
+      }
+
+      .adventure-card p {
+        font-size: 20px;
+        line-height: 1.75;
+      }
+    }
+
+    /* โทรศัพท์หน้าจอแคบมาก */
+    @media (max-width: 380px) {
+      .card {
+        padding-inline: 15px;
+      }
+
+      h1 {
+        font-size: 29px;
+      }
+
+      .subtitle {
+        font-size: 18px;
+      }
+
+      .role-button {
+        padding-inline: 16px;
+      }
+
+      .role-name {
+        font-size: 19px;
+      }
+
+      input {
+        font-size: 19px;
+      }
+    }
+
+
+    /* ===== AR Scanner V3.0 ===== */
+    .ar-start-button { margin-top: 24px; }
+    .ar-hint { margin-top: 14px !important; font-size: 15px !important; }
+    .scanner-screen {
+      position: fixed; inset: 0; z-index: 500; display: none;
+      background: #020711; color: #fff;
+    }
+    .scanner-screen.show { display: block; }
+    .camera-video { width: 100%; height: 100%; object-fit: cover; background: #000; }
+    .scanner-shade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,.38), transparent 24%, transparent 72%, rgba(0,0,0,.55)); }
+    .scanner-topbar {
+      position: absolute; top: 0; left: 0; right: 0; z-index: 2;
+      padding: max(14px, env(safe-area-inset-top)) 14px 12px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .scanner-close, .scanner-manual {
+      border: 1px solid rgba(255,255,255,.32); color: #fff;
+      background: rgba(4,14,35,.72); backdrop-filter: blur(12px);
+      border-radius: 999px; min-height: 48px; padding: 0 17px; font-weight: 800;
+    }
+    .scanner-title { flex: 1; text-align: center; font-size: 18px; font-weight: 800; text-shadow: 0 2px 8px #000; }
+    .scan-frame {
+      position: absolute; width: min(72vw, 340px); aspect-ratio: 1;
+      left: 50%; top: 48%; transform: translate(-50%,-50%);
+      border: 3px solid rgba(255,225,105,.95); border-radius: 28px;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,.20), 0 0 35px rgba(255,210,70,.34);
+      pointer-events: none;
+    }
+    .scan-line { position: absolute; left: 8%; right: 8%; height: 3px; top: 12%; border-radius: 3px; background: #ffe36f; box-shadow: 0 0 14px #ffd33d; animation: scanMove 2.2s ease-in-out infinite alternate; }
+    @keyframes scanMove { to { top: 87%; } }
+    .scanner-status {
+      position: absolute; left: 18px; right: 18px; bottom: max(24px, calc(env(safe-area-inset-bottom) + 14px));
+      padding: 14px 18px; border-radius: 18px; text-align: center; font-weight: 700;
+      background: rgba(4,14,35,.78); backdrop-filter: blur(12px);
+    }
+    .content-modal {
+      position: fixed; inset: 0; z-index: 600; display: none; place-items: center;
+      padding: max(18px, env(safe-area-inset-top)) 16px max(18px, env(safe-area-inset-bottom));
+      background: rgba(1,6,17,.78); backdrop-filter: blur(14px);
+    }
+    .content-modal.show { display: grid; }
+    .content-card {
+      width: min(100%, 520px); max-height: 94dvh; overflow-y: auto;
+      padding: 22px; border: 1px solid rgba(255,255,255,.22); border-radius: 30px;
+      text-align: center; background: linear-gradient(180deg, rgba(10,28,62,.97), rgba(4,13,32,.98));
+      box-shadow: 0 28px 80px rgba(0,0,0,.55);
+    }
+    .content-badge { display: inline-flex; padding: 7px 13px; border-radius: 999px; background: rgba(255,218,82,.14); color: #ffe98f; font-weight: 800; }
+    .content-visual { width: 100%; min-height: 250px; margin: 16px 0; display: grid; place-items: center; border-radius: 24px; overflow: hidden; background: rgba(255,255,255,.08); }
+    .content-image { display: none; width: 100%; max-height: 390px; object-fit: contain; }
+    .content-image.show { display: block; }
+    .content-model { display: none; width: 100%; height: min(45vh, 390px); background: transparent; }
+    .content-model.show { display: block; }
+    .content-letter { margin: 2px 0 0; font-size: clamp(58px, 17vw, 96px); line-height: 1; color: #ffe275; }
+    .content-word { margin: 7px 0 0; font-size: clamp(30px, 9vw, 48px); text-transform: uppercase; }
+    .content-display { margin: 8px 0 18px; color: rgba(255,255,255,.82); font-size: 20px; }
+    .content-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .content-actions button { min-height: 58px; border-radius: 18px; font-weight: 800; font-size: 18px; }
+    .manual-box { display: none; position: absolute; left: 16px; right: 16px; bottom: max(24px, calc(env(safe-area-inset-bottom) + 14px)); z-index: 4; padding: 16px; border-radius: 20px; background: rgba(4,14,35,.94); }
+    .manual-box.show { display: grid; gap: 10px; }
+    .manual-box input { text-transform: uppercase; }
+    @media (max-width: 600px) {
+      .scanner-title { font-size: 16px; }
+      .content-card { padding: 18px; border-radius: 25px; }
+      .content-visual { min-height: 220px; }
+      .content-actions { grid-template-columns: 1fr; }
+    }
+
+  </style>
+</head>
+
+<body>
+  <div class="loading" id="loading"><div><div class="loader-orb"></div><div>กำลังเปิดประตูสู่การผจญภัย...</div></div></div>
+  <div class="app">
+    <div class="wallpaper" id="wallpaper"></div>
+    <div class="vignette"></div>
+    <div class="fireflies" id="fireflies"></div>
+    <audio id="bgm" loop preload="auto"></audio>
+
+    <main class="screen" id="loginScreen">
+      <section class="card">
+        <div class="logo-wrap">
+          <img class="logo" id="logo" alt="โลโก้ Phonics Heroes">
+          <div class="placeholder" id="logoPlaceholder">✨</div>
+        </div>
+
+        <h1 id="appName">Phonics Heroes AR Openworld</h1>
+        <p class="subtitle" id="subtitle">เปิดโลกแห่งเสียงโฟนิกส์</p>
+
+        <section class="panel-step active" id="roleStep">
+          <p class="step-title">เลือกบทบาทของนักผจญภัย</p>
+
+          <div class="role-grid">
+            <button class="role-button active" type="button" data-role="นักเรียน">
+              <span class="role-icon">🎒</span>
+              <span class="role-name">นักเรียน</span>
+            </button>
+
+            <button class="role-button" type="button" data-role="ครู">
+              <span class="role-icon">📚</span>
+              <span class="role-name">ครู</span>
+            </button>
+
+            <button class="role-button" type="button" data-role="ทั่วไป">
+              <span class="role-icon">🌏</span>
+              <span class="role-name">ทั่วไป</span>
+            </button>
+          </div>
+
+          <button class="main-button" id="roleNextButton" type="button">
+            ต่อไป
+          </button>
+        </section>
+
+        <section class="panel-step" id="detailStep">
+          <p class="selected-role" id="selectedRoleText">บทบาท: นักเรียน</p>
+
+          <form class="form-area" id="detailForm">
+            <div class="field">
+              <label for="displayName">ชื่อจริง</label>
+              <input
+                id="displayName"
+                type="text"
+                maxlength="100"
+                autocomplete="name"
+                placeholder="กรอกชื่อจริง"
+                required
+              >
+            </div>
+
+            <div class="field hidden" id="schoolField">
+              <label for="school">ชื่อโรงเรียน</label>
+              <input
+                id="school"
+                type="text"
+                maxlength="180"
+                autocomplete="organization"
+                placeholder="กรอกชื่อโรงเรียน"
+              >
+            </div>
+
+            <div class="field hidden" id="provinceField">
+              <label for="province">จังหวัด</label>
+              <input
+                id="province"
+                type="text"
+                maxlength="100"
+                autocomplete="address-level1"
+                placeholder="กรอกจังหวัด"
+              >
+            </div>
+
+            <div class="button-row">
+              <button class="secondary-button" id="backButton" type="button">
+                ย้อนกลับ
+              </button>
+
+              <button class="main-button" id="startButton" type="submit">
+                เริ่มผจญภัย
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <div class="message" id="message" role="status" aria-live="polite"></div>
+        <p class="developer" id="developer">พัฒนาโดย ครูมัชมีนา โกสุม</p>
+      </section>
+    </main>
+
+    <section class="adventure-screen" id="adventureScreen">
+      <div class="adventure-card">
+        <h2>ยินดีต้อนรับ นักผจญภัย!</h2>
+        <p>
+          <span class="hero-name" id="heroName"></span><br>
+          ตามหา QR ที่ซ่อนอยู่ แล้วเปิดโลกแห่งเสียงโฟนิกส์
+        </p>
+        <button class="main-button ar-start-button" id="openScannerButton" type="button">📷 เปิดกล้องสแกน QR</button>
+        <p class="ar-hint">อนุญาตใช้กล้องเมื่อโทรศัพท์ถาม ระบบจะอ่านเฉพาะ QR ภายในกิจกรรมนี้</p>
+      </div>
+    </section>
+
+    <section class="scanner-screen" id="scannerScreen" aria-hidden="true">
+      <video class="camera-video" id="cameraVideo" playsinline muted></video>
+      <canvas id="scannerCanvas" hidden></canvas>
+      <div class="scanner-shade"></div>
+      <div class="scanner-topbar">
+        <button class="scanner-close" id="closeScannerButton" type="button">✕ ปิด</button>
+        <div class="scanner-title">เล็ง QR ให้อยู่ในกรอบ</div>
+        <button class="scanner-manual" id="manualButton" type="button">⌨️ กรอกรหัส</button>
+      </div>
+      <div class="scan-frame"><div class="scan-line"></div></div>
+      <div class="scanner-status" id="scannerStatus">กำลังเตรียมกล้อง...</div>
+      <div class="manual-box" id="manualBox">
+        <input id="manualContentId" type="text" maxlength="120" placeholder="เช่น A_001">
+        <button class="main-button" id="manualSubmitButton" type="button">เปิดเนื้อหา</button>
+      </div>
+    </section>
+
+    <section class="content-modal" id="contentModal" aria-hidden="true">
+      <div class="content-card">
+        <div class="content-badge" id="contentIdBadge">QR</div>
+        <div class="content-visual">
+          <img class="content-image" id="contentImage" alt="ภาพคำศัพท์">
+          <model-viewer class="content-model" id="contentModel" camera-controls auto-rotate interaction-prompt="none" shadow-intensity="0"></model-viewer>
+        </div>
+        <h3 class="content-letter" id="contentLetter"></h3>
+        <h2 class="content-word" id="contentWord"></h2>
+        <p class="content-display" id="contentDisplay"></p>
+        <audio id="contentAudio" preload="auto"></audio>
+        <div class="content-actions">
+          <button class="main-button" id="playContentAudioButton" type="button">🔊 ฟังเสียง</button>
+          <button class="secondary-button" id="scanNextButton" type="button">📷 สแกนคำต่อไป</button>
+        </div>
+      </div>
+    </section>
+    </div>
+  </div>
+
+  <script>
+    const INITIAL_CONTENT_ID =
+      new URLSearchParams(window.location.search).get('id') || '';
+
+    // วาง URL เว็บแอป Apps Script ที่ลงท้ายด้วย /exec หลัง Deploy เวอร์ชันใหม่
+    const API_URL = 'https://script.google.com/macros/s/AKfycbxKd9bEaK0pcUFNB3k2jKLxlkTUeit4_4m8Vh8mYWt22lWADg8CuHSrU9MIfgwRzVFK/exec';
+
+    function apiRequest(action, params) {
+      params = params || {};
+
+      return new Promise(function(resolve, reject) {
+        if (!API_URL || API_URL.indexOf('PASTE_YOUR_') === 0) {
+          reject(new Error('ยังไม่ได้ใส่ Apps Script API URL ในตัวแปร API_URL'));
+          return;
+        }
+
+        const callbackName = '__phonicsApiCallback_' +
+          Date.now() + '_' + Math.random().toString(36).slice(2);
+        const script = document.createElement('script');
+        const query = new URLSearchParams();
+        let finished = false;
+
+        query.set('action', action);
+        query.set('callback', callbackName);
+
+        Object.keys(params).forEach(function(key) {
+          const value = params[key];
+          if (value !== undefined && value !== null) {
+            query.set(key, String(value));
+          }
+        });
+
+        const cleanup = function() {
+          if (script.parentNode) script.parentNode.removeChild(script);
+          try { delete window[callbackName]; } catch (error) { window[callbackName] = undefined; }
+        };
+
+        const timer = setTimeout(function() {
+          if (finished) return;
+          finished = true;
+          cleanup();
+          reject(new Error('เชื่อมต่อ API ใช้เวลานานเกินไป'));
+        }, 20000);
+
+        window[callbackName] = function(response) {
+          if (finished) return;
+          finished = true;
+          clearTimeout(timer);
+          cleanup();
+          resolve(response);
+        };
+
+        script.onerror = function() {
+          if (finished) return;
+          finished = true;
+          clearTimeout(timer);
+          cleanup();
+          reject(new Error('โหลดข้อมูลจาก Apps Script API ไม่สำเร็จ'));
+        };
+
+        script.src = API_URL + (API_URL.indexOf('?') === -1 ? '?' : '&') + query.toString();
+        script.async = true;
+        document.head.appendChild(script);
+      });
+    }
+
+    const state = {
+      role: 'นักเรียน',
+      settings: {},
+      musicEnabled: false,
+      currentUser: null,
+      currentContent: null,
+      scannerStream: null,
+      scannerFrameId: 0,
+      scannerBusy: false,
+      jsQrLoadPromise: null,
+      modelViewerLoadPromise: null,
+      contentAudioCache: {}
+    };
+
+    const byId = id => document.getElementById(id);
+
+    const MUSIC = {
+      backgroundMusic: null,
+      musicUnlocked: false,
+      pendingMusicStart: false,
+      mediaDataCache: {},
+      fileId: '1SMOdbyT1jhIusWxGikjfoFJYsKVZE_bX',
+      fallbackUrl:
+        'https://drive.usercontent.google.com/download?id=1SMOdbyT1jhIusWxGikjfoFJYsKVZE_bX&export=download&confirm=t',
+      volume: 0.45,
+      prompt: null
+    };
+
+    const elements = {
+      wallpaper: byId('wallpaper'),
+      fireflies: byId('fireflies'),
+      logo: byId('logo'),
+      logoPlaceholder: byId('logoPlaceholder'),
+      appName: byId('appName'),
+      subtitle: byId('subtitle'),
+      developer: byId('developer'),
+      roleStep: byId('roleStep'),
+      detailStep: byId('detailStep'),
+      selectedRoleText: byId('selectedRoleText'),
+      roleNextButton: byId('roleNextButton'),
+      backButton: byId('backButton'),
+      detailForm: byId('detailForm'),
+      displayName: byId('displayName'),
+      schoolField: byId('schoolField'),
+      school: byId('school'),
+      provinceField: byId('provinceField'),
+      province: byId('province'),
+      startButton: byId('startButton'),
+      message: byId('message'),
+      bgm: byId('bgm'),
+      loading: byId('loading'),
+      loginScreen: byId('loginScreen'),
+      adventureScreen: byId('adventureScreen'),
+      heroName: byId('heroName'),
+      openScannerButton: byId('openScannerButton'),
+      scannerScreen: byId('scannerScreen'),
+      cameraVideo: byId('cameraVideo'),
+      scannerCanvas: byId('scannerCanvas'),
+      closeScannerButton: byId('closeScannerButton'),
+      manualButton: byId('manualButton'),
+      manualBox: byId('manualBox'),
+      manualContentId: byId('manualContentId'),
+      manualSubmitButton: byId('manualSubmitButton'),
+      scannerStatus: byId('scannerStatus'),
+      contentModal: byId('contentModal'),
+      contentIdBadge: byId('contentIdBadge'),
+      contentImage: byId('contentImage'),
+      contentModel: byId('contentModel'),
+      contentLetter: byId('contentLetter'),
+      contentWord: byId('contentWord'),
+      contentDisplay: byId('contentDisplay'),
+      contentAudio: byId('contentAudio'),
+      playContentAudioButton: byId('playContentAudioButton'),
+      scanNextButton: byId('scanNextButton')
+    };
+
+    document.addEventListener('DOMContentLoaded', initialize);
+
+    function initialize() {
+      installMusicUnlock();
+      installMusicPrompt();
+
+      // ป้องกันหน้าค้างที่ Loading หากเบราว์เซอร์ภายในแอปตอบสนองช้า
+      setTimeout(function() {
+        if (elements.loading && !elements.loading.classList.contains('hidden')) {
+          hideLoading();
+          showMessage('ระบบใช้เวลาโหลดนาน กรุณาลองรีเฟรชหากข้อมูลยังไม่ปรากฏ');
+        }
+      }, 12000);
+
+      document.querySelectorAll('.role-button').forEach(function(button) {
+        button.addEventListener('click', function() {
+          selectRole(button.dataset.role);
+        });
+      });
+
+      elements.roleNextButton.addEventListener('click', openDetailStep);
+      elements.backButton.addEventListener('click', openRoleStep);
+      elements.detailForm.addEventListener('submit', submitUser);
+      elements.openScannerButton.addEventListener('click', openScanner);
+      elements.closeScannerButton.addEventListener('click', closeScanner);
+      elements.manualButton.addEventListener('click', toggleManualEntry);
+      elements.manualSubmitButton.addEventListener('click', submitManualContentId);
+      elements.playContentAudioButton.addEventListener('click', playCurrentContentAudio);
+      elements.scanNextButton.addEventListener('click', scanNextContent);
+      elements.manualContentId.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') submitManualContentId();
+      });
+
+apiRequest('bootstrap')
+        .then(function(response) {
+          if (!response || !response.ok) {
+            showMessage((response && response.message) || 'โหลดการตั้งค่าไม่สำเร็จ');
+            hideLoading();
+            return;
+          }
+
+          state.settings = response.settings || {};
+          applySettings(state.settings);
+          hideLoading();
+        })
+        .catch(function(error) {
+          console.error(error);
+          showMessage(error.message || 'โหลดระบบไม่สำเร็จ กรุณาเปิดใหม่อีกครั้ง');
+          hideLoading();
+        });
+    }
+
+    function applySettings(settings) {
+      elements.appName.textContent =
+        settings.APP_NAME || 'Phonics Heroes AR Openworld';
+
+      elements.subtitle.textContent =
+        settings.SUBTITLE || 'เปิดโลกแห่งเสียงโฟนิกส์';
+
+      elements.developer.textContent =
+        settings.DEVELOPER || 'พัฒนาโดย ครูมัชมีนา โกสุม';
+
+      elements.startButton.textContent =
+        settings.START_BUTTON_TEXT || 'เริ่มผจญภัย';
+
+      setLogo(settings.LOGO_URL);
+      setWallpaper(settings.WALLPAPERS || []);
+      prepareBackgroundMusic();
+      playOpeningMusic();
+
+      if (settings.FIREFLY_EFFECT !== false) {
+        createFireflies(34);
+      }
+    }
+
+    function selectRole(role) {
+      state.role = role;
+
+      document.querySelectorAll('.role-button').forEach(function(button) {
+        button.classList.toggle('active', button.dataset.role === role);
+      });
+
+      showMessage('');
+    }
+
+    function openDetailStep() {
+      elements.selectedRoleText.textContent = 'บทบาท: ' + state.role;
+
+      const isTeacher = state.role === 'ครู';
+      const isGeneral = state.role === 'ทั่วไป';
+
+      elements.schoolField.classList.toggle('hidden', !isTeacher);
+      elements.provinceField.classList.toggle('hidden', !isGeneral);
+
+      elements.school.required = isTeacher;
+      elements.province.required = isGeneral;
+
+      if (!isTeacher) {
+        elements.school.value = '';
+      }
+
+      if (!isGeneral) {
+        elements.province.value = '';
+      }
+
+      elements.roleStep.classList.remove('active');
+      elements.detailStep.classList.add('active');
+      showMessage('');
+
+      setTimeout(function() {
+        elements.displayName.focus();
+      }, 150);
+    }
+
+    function openRoleStep() {
+      elements.detailStep.classList.remove('active');
+      elements.roleStep.classList.add('active');
+      showMessage('');
+    }
+
+    function submitUser(event) {
+      event.preventDefault();
+      const payload = {
+        role: state.role,
+        displayName: elements.displayName.value.trim(),
+        school: elements.school.value.trim(),
+        province: elements.province.value.trim(),
+        userAgent: navigator.userAgent
+      };
+
+      const validationMessage = validateUser(payload);
+
+      if (validationMessage) {
+        showMessage(validationMessage);
+        return;
+      }
+
+      setSubmitting(true);
+      showMessage('กำลังบันทึกข้อมูลนักผจญภัย...', true);
+
+      apiRequest('registerUser', payload)
+        .then(function(response) {
+          setSubmitting(false);
+
+          if (!response || !response.ok) {
+            showMessage((response && response.message) || 'บันทึกข้อมูลไม่สำเร็จ');
+            return;
+          }
+
+          showAdventure(response.user);
+        })
+        .catch(function(error) {
+          console.error(error);
+          setSubmitting(false);
+          showMessage(error.message || 'เชื่อมต่อระบบไม่สำเร็จ กรุณาลองอีกครั้ง');
+        });
+    }
+
+    function validateUser(payload) {
+      if (!payload.displayName) {
+        return 'กรุณากรอกชื่อจริง';
+      }
+
+      if (state.role === 'ครู' && !payload.school) {
+        return 'กรุณากรอกชื่อโรงเรียน';
+      }
+
+      if (state.role === 'ทั่วไป' && !payload.province) {
+        return 'กรุณากรอกจังหวัด';
+      }
+
+      return '';
+    }
+
+    function showAdventure(user) {
+      state.currentUser = user || null;
+      elements.heroName.textContent = user.displayName;
+      elements.loginScreen.style.display = 'none';
+      elements.adventureScreen.classList.add('show');
+
+      try {
+        sessionStorage.setItem('phonicsHeroesUser', JSON.stringify(user));
+
+        if (INITIAL_CONTENT_ID) {
+          sessionStorage.setItem(
+            'phonicsHeroesContentId',
+            INITIAL_CONTENT_ID
+          );
+          setTimeout(function() {
+            loadARContent(INITIAL_CONTENT_ID);
+          }, 350);
+        }
+      } catch (error) {
+        // บางเบราว์เซอร์ภายในแอปอาจปิดกั้น sessionStorage
+      }
+    }
+
+    function setLogo(url) {
+      if (!url) return;
+
+      elements.logo.onload = function() {
+        elements.logo.classList.add('show');
+        elements.logoPlaceholder.classList.add('hidden');
+      };
+
+      elements.logo.onerror = function() {
+        elements.logo.classList.remove('show');
+        elements.logoPlaceholder.classList.remove('hidden');
+      };
+
+      elements.logo.src = normalizeDriveUrl(url, 'image');
+    }
+
+    function setWallpaper(urls) {
+      const validUrls = (urls || []).filter(Boolean);
+      if (!validUrls.length) return;
+
+      const selectedUrl =
+        validUrls[Math.floor(Math.random() * validUrls.length)];
+
+      const imageUrl = normalizeDriveUrl(selectedUrl, 'image');
+      const preload = new Image();
+
+      preload.onload = function() {
+        elements.wallpaper.style.backgroundImage =
+          'url("' + imageUrl.replace(/"/g, '\\"') + '")';
+      };
+
+      preload.src = imageUrl;
+    }
+
+    function installMusicPrompt() {
+      if (document.getElementById('globalMusicPrompt')) {
+        MUSIC.prompt = document.getElementById('globalMusicPrompt');
+        return;
+      }
+
+      const prompt = document.createElement('div');
+      prompt.id = 'globalMusicPrompt';
+      prompt.textContent = '🔊 แตะหน้าจอหนึ่งครั้งเพื่อเปิดเสียง';
+
+      Object.assign(prompt.style, {
+        position: 'fixed',
+        left: '50%',
+        bottom: 'max(22px, calc(env(safe-area-inset-bottom) + 10px))',
+        transform: 'translateX(-50%)',
+        zIndex: '99999',
+        maxWidth: 'calc(100vw - 24px)',
+        padding: '15px 22px',
+        borderRadius: '999px',
+        background: 'rgba(8, 22, 48, .88)',
+        color: '#ffffff',
+        fontFamily: 'Sarabun, sans-serif',
+        fontSize: 'clamp(18px, 4.8vw, 25px)',
+        fontWeight: '700',
+        textAlign: 'center',
+        boxShadow: '0 8px 24px rgba(0, 0, 0, .30)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        opacity: '1',
+        visibility: 'visible',
+        pointerEvents: 'none',
+        transition: 'opacity .22s ease, visibility .22s ease'
+      });
+
+      document.body.appendChild(prompt);
+      MUSIC.prompt = prompt;
+    }
+
+    function showMusicPrompt(text) {
+      installMusicPrompt();
+
+      if (!MUSIC.prompt) return;
+
+      MUSIC.prompt.textContent =
+        text || '🔊 แตะหน้าจอหนึ่งครั้งเพื่อเปิดเสียง';
+      MUSIC.prompt.style.visibility = 'visible';
+      MUSIC.prompt.style.opacity = '1';
+    }
+
+    function hideMusicPrompt() {
+      if (!MUSIC.prompt) return;
+
+      MUSIC.prompt.style.opacity = '0';
+
+      setTimeout(function() {
+        if (MUSIC.musicUnlocked &&
+            MUSIC.backgroundMusic &&
+            !MUSIC.backgroundMusic.paused) {
+          MUSIC.prompt.style.visibility = 'hidden';
+        }
+      }, 230);
+    }
+
+    function prepareBackgroundMusic() {
+      MUSIC.backgroundMusic = document.getElementById('bgm');
+
+      if (!MUSIC.backgroundMusic) return;
+
+      MUSIC.backgroundMusic.loop = true;
+      MUSIC.backgroundMusic.volume = MUSIC.volume;
+      MUSIC.backgroundMusic.preload = 'auto';
+      MUSIC.backgroundMusic.muted = false;
+      MUSIC.backgroundMusic.dataset.fileId = MUSIC.fileId;
+      MUSIC.backgroundMusic.dataset.fallbackUrl = MUSIC.fallbackUrl;
+
+      showMusicPrompt('🔊 แตะหน้าจอหนึ่งครั้งเพื่อเปิดเสียง');
+
+      if (MUSIC.musicUnlocked) {
+        prepareBackgroundMusicData();
+      }
+    }
+
+    function prepareBackgroundMusicData() {
+      loadMusicSource(MUSIC.backgroundMusic, function() {
+        if (MUSIC.pendingMusicStart || MUSIC.musicUnlocked) {
+          MUSIC.pendingMusicStart = false;
+          playOpeningMusic();
+        }
+      });
+    }
+
+    function loadMusicSource(audioElement, onReady) {
+      if (!audioElement || audioElement.src) {
+        if (onReady) onReady();
+        return;
+      }
+
+      const fallbackUrl = audioElement.dataset.fallbackUrl || '';
+      if (fallbackUrl) {
+        audioElement.src = fallbackUrl;
+        audioElement.load();
+      }
+
+      if (onReady) onReady();
+    }
+
+    function installMusicUnlock() {
+      const unlock = function() {
+        MUSIC.musicUnlocked = true;
+        showMusicPrompt('🔊 กำลังเปิดเสียง...');
+
+        prepareBackgroundMusicData();
+        playOpeningMusic();
+
+        document.removeEventListener('pointerdown', unlock);
+        document.removeEventListener('keydown', unlock);
+        document.removeEventListener('touchstart', unlock);
+        document.removeEventListener('click', unlock);
+      };
+
+      document.addEventListener('pointerdown', unlock, { once: true });
+      document.addEventListener('touchstart', unlock, {
+        once: true,
+        passive: true
+      });
+      document.addEventListener('click', unlock, { once: true });
+      document.addEventListener('keydown', unlock, { once: true });
+    }
+
+    function playOpeningMusic() {
+      if (!MUSIC.backgroundMusic) {
+        MUSIC.pendingMusicStart = true;
+        return;
+      }
+
+      if (!MUSIC.backgroundMusic.src) {
+        MUSIC.pendingMusicStart = true;
+
+        if (MUSIC.musicUnlocked) {
+          prepareBackgroundMusicData();
+        }
+
+        return;
+      }
+
+      MUSIC.backgroundMusic.muted = false;
+      MUSIC.backgroundMusic.volume = MUSIC.volume;
+
+      const playPromise = MUSIC.backgroundMusic.play();
+
+      if (playPromise && typeof playPromise.then === 'function') {
+        playPromise
+          .then(function() {
+            MUSIC.pendingMusicStart = false;
+            hideMusicPrompt();
+          })
+          .catch(function(error) {
+            console.warn('เบราว์เซอร์ยังไม่อนุญาตให้เล่นเพลง', error);
+            MUSIC.pendingMusicStart = true;
+            showMusicPrompt('🔊 แตะหน้าจออีกครั้งเพื่อเปิดเสียง');
+            reinstallMusicUnlock();
+          });
+      }
+    }
+
+    function reinstallMusicUnlock() {
+      const retry = function() {
+        MUSIC.musicUnlocked = true;
+        playOpeningMusic();
+
+        document.removeEventListener('pointerdown', retry);
+        document.removeEventListener('touchstart', retry);
+        document.removeEventListener('click', retry);
+        document.removeEventListener('keydown', retry);
+      };
+
+      document.addEventListener('pointerdown', retry, { once: true });
+      document.addEventListener('touchstart', retry, {
+        once: true,
+        passive: true
+      });
+      document.addEventListener('click', retry, { once: true });
+      document.addEventListener('keydown', retry, { once: true });
+    }
+
+    function createFireflies(count) {
+      elements.fireflies.innerHTML = '';
+
+      for (let index = 0; index < count; index += 1) {
+        const firefly = document.createElement('span');
+        const duration = 8 + Math.random() * 11;
+
+        firefly.className = 'firefly';
+        firefly.style.left = Math.random() * 100 + '%';
+        firefly.style.setProperty('--size', 2 + Math.random() * 4.2 + 'px');
+        firefly.style.setProperty('--duration', duration + 's');
+        firefly.style.setProperty('--delay', -Math.random() * duration + 's');
+        firefly.style.setProperty(
+          '--drift-a',
+          -35 + Math.random() * 70 + 'px'
+        );
+        firefly.style.setProperty(
+          '--drift-b',
+          -70 + Math.random() * 140 + 'px'
+        );
+
+        elements.fireflies.appendChild(firefly);
+      }
+    }
+
+
+
+    function loadExternalScript_(url, options) {
+      options = options || {};
+
+      return new Promise(function(resolve, reject) {
+        const existing = document.querySelector('script[data-dynamic-src="' + url + '"]');
+
+        if (existing) {
+          if (existing.dataset.loaded === 'true') {
+            resolve();
+            return;
+          }
+
+          existing.addEventListener('load', resolve, { once: true });
+          existing.addEventListener('error', reject, { once: true });
+          return;
+        }
+
+        const script = document.createElement('script');
+        script.src = url;
+        script.async = true;
+        script.dataset.dynamicSrc = url;
+
+        if (options.module) {
+          script.type = 'module';
+        }
+
+        script.onload = function() {
+          script.dataset.loaded = 'true';
+          resolve();
+        };
+
+        script.onerror = function() {
+          reject(new Error('โหลดไฟล์ภายนอกไม่สำเร็จ: ' + url));
+        };
+
+        document.head.appendChild(script);
+      });
+    }
+
+    function ensureJsQrLoaded_() {
+      if (typeof window.jsQR === 'function') {
+        return Promise.resolve();
+      }
+
+      if (state.jsQrLoadPromise) {
+        return state.jsQrLoadPromise;
+      }
+
+      const urls = [
+        'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js',
+        'https://unpkg.com/jsqr@1.4.0/dist/jsQR.js'
+      ];
+
+      state.jsQrLoadPromise = new Promise(function(resolve, reject) {
+        let index = 0;
+
+        const tryNext = function() {
+          if (typeof window.jsQR === 'function') {
+            resolve();
+            return;
+          }
+
+          if (index >= urls.length) {
+            state.jsQrLoadPromise = null;
+            reject(new Error('โหลดระบบอ่าน QR ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ต'));
+            return;
+          }
+
+          loadExternalScript_(urls[index++])
+            .then(function() {
+              if (typeof window.jsQR === 'function') {
+                resolve();
+              } else {
+                tryNext();
+              }
+            })
+            .catch(tryNext);
+        };
+
+        tryNext();
+      });
+
+      return state.jsQrLoadPromise;
+    }
+
+    function ensureModelViewerLoaded_() {
+      if (customElements.get('model-viewer')) {
+        return Promise.resolve();
+      }
+
+      if (state.modelViewerLoadPromise) {
+        return state.modelViewerLoadPromise;
+      }
+
+      state.modelViewerLoadPromise = loadExternalScript_(
+        'https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js',
+        { module: true }
+      ).then(function() {
+        return customElements.whenDefined('model-viewer');
+      }).catch(function(error) {
+        state.modelViewerLoadPromise = null;
+        throw error;
+      });
+
+      return state.modelViewerLoadPromise;
+    }
+
+
+    /* ===== Camera + QR + AR Content V3.0 ===== */
+    async function openScanner() {
+      closeContentModal();
+      elements.manualBox.classList.remove('show');
+      elements.scannerScreen.classList.add('show');
+      elements.scannerScreen.setAttribute('aria-hidden', 'false');
+      elements.scannerStatus.textContent = 'กำลังขออนุญาตเปิดกล้อง...';
+      state.scannerBusy = false;
+
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('เบราว์เซอร์นี้ไม่รองรับการเปิดกล้อง');
+        }
+
+        await ensureJsQrLoaded_();
+
+        state.scannerStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        });
+
+        elements.cameraVideo.srcObject = state.scannerStream;
+        await elements.cameraVideo.play();
+        elements.scannerStatus.textContent = 'พร้อมแล้ว เล็ง QR ให้อยู่กลางกรอบ';
+        scanCameraFrame();
+      } catch (error) {
+        console.error(error);
+        elements.scannerStatus.textContent = cameraErrorMessage(error);
+        elements.manualBox.classList.add('show');
+      }
+    }
+
+    function scanCameraFrame() {
+      if (!elements.scannerScreen.classList.contains('show') || state.scannerBusy) {
+        return;
+      }
+
+      const video = elements.cameraVideo;
+      const canvas = elements.scannerCanvas;
+
+      if (video.readyState >= 2 && video.videoWidth && video.videoHeight) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        const result = window.jsQR(
+          imageData.data,
+          imageData.width,
+          imageData.height,
+          { inversionAttempts: 'attemptBoth' }
+        );
+
+        if (result && result.data) {
+          handleScannedText(result.data);
+          return;
+        }
+      }
+
+      state.scannerFrameId = requestAnimationFrame(scanCameraFrame);
+    }
+
+    function closeScanner() {
+      stopScannerCamera();
+      elements.scannerScreen.classList.remove('show');
+      elements.scannerScreen.setAttribute('aria-hidden', 'true');
+      elements.manualBox.classList.remove('show');
+      state.scannerBusy = false;
+    }
+
+    function stopScannerCamera() {
+      if (state.scannerFrameId) {
+        cancelAnimationFrame(state.scannerFrameId);
+        state.scannerFrameId = 0;
+      }
+
+      const stream = state.scannerStream || elements.cameraVideo.srcObject;
+      if (stream && typeof stream.getTracks === 'function') {
+        stream.getTracks().forEach(function(track) { track.stop(); });
+      }
+
+      state.scannerStream = null;
+      elements.cameraVideo.srcObject = null;
+    }
+
+    function toggleManualEntry() {
+      elements.manualBox.classList.toggle('show');
+      if (elements.manualBox.classList.contains('show')) {
+        setTimeout(function() { elements.manualContentId.focus(); }, 80);
+      }
+    }
+
+    function submitManualContentId() {
+      const id = elements.manualContentId.value.trim();
+      if (!id) {
+        elements.scannerStatus.textContent = 'กรุณากรอกรหัส เช่น A_001';
+        return;
+      }
+      handleScannedText(id);
+    }
+
+    function handleScannedText(rawText) {
+      const contentId = extractContentId(rawText);
+      if (!contentId || state.scannerBusy) return;
+
+      state.scannerBusy = true;
+      elements.scannerStatus.textContent = 'พบ QR แล้ว กำลังเปิด ' + contentId + '...';
+      stopScannerCamera();
+      loadARContent(contentId);
+    }
+
+    function extractContentId(rawText) {
+      const text = String(rawText || '').trim();
+      if (!text) return '';
+
+      try {
+        const url = new URL(text);
+        const fromQuery = url.searchParams.get('id');
+        if (fromQuery) return fromQuery.trim().toUpperCase();
+      } catch (error) {
+        // QR แบบสั้น เช่น A_001 ไม่ใช่ URL
+      }
+
+      return text.replace(/^ID\s*[:=]\s*/i, '').trim().toUpperCase();
+    }
+
+    function loadARContent(contentId) {
+      apiRequest('getARContent', { contentId: contentId })
+        .then(function(response) {
+          state.scannerBusy = false;
+
+          if (!response || !response.ok || !response.content) {
+            elements.scannerStatus.textContent =
+              (response && response.message) || 'ไม่พบข้อมูลของ QR นี้';
+            elements.scannerScreen.classList.add('show');
+            elements.manualBox.classList.add('show');
+            return;
+          }
+
+          closeScanner();
+          showARContent(response.content);
+          logCurrentActivity(response.content);
+        })
+        .catch(function(error) {
+          console.error(error);
+          state.scannerBusy = false;
+          elements.scannerStatus.textContent =
+            error.message || 'เชื่อมต่อชีตไม่สำเร็จ กรุณาลองอีกครั้ง';
+          elements.scannerScreen.classList.add('show');
+          elements.manualBox.classList.add('show');
+        });
+    }
+
+    async function showARContent(content) {
+      state.currentContent = content;
+      elements.contentIdBadge.textContent = content.id || 'QR';
+      elements.contentLetter.textContent = content.letter || '';
+      elements.contentWord.textContent = content.word || '';
+      elements.contentDisplay.textContent =
+        content.displayText || content.answer || '';
+
+      elements.contentImage.classList.remove('show');
+      elements.contentModel.classList.remove('show');
+      elements.contentImage.removeAttribute('src');
+      elements.contentModel.removeAttribute('src');
+
+      const type = String(content.fileType || '').toUpperCase();
+      if ((type === 'GLB' || type === 'GLTF') && content.fileUrl) {
+        try {
+          await ensureModelViewerLoaded_();
+          elements.contentModel.src = normalizeDriveUrl(content.fileUrl, 'file');
+          elements.contentModel.style.setProperty('--poster-color', 'transparent');
+          elements.contentModel.classList.add('show');
+        } catch (error) {
+          console.error('โหลดระบบโมเดล 3D ไม่สำเร็จ', error);
+          elements.contentDisplay.textContent =
+            (elements.contentDisplay.textContent ? elements.contentDisplay.textContent + ' • ' : '') +
+            'ยังไม่สามารถแสดงโมเดล 3D ได้';
+        }
+      } else if (content.fileUrl) {
+        elements.contentImage.src = normalizeDriveUrl(content.fileUrl, 'image');
+        elements.contentImage.classList.add('show');
+      }
+
+      prepareContentAudio(content.audioUrl);
+      elements.contentModal.classList.add('show');
+      elements.contentModal.setAttribute('aria-hidden', 'false');
+    }
+
+    function prepareContentAudio(url) {
+      const fileId = extractDriveFileId(url);
+      elements.contentAudio.pause();
+      elements.contentAudio.removeAttribute('src');
+      elements.contentAudio.dataset.fileId = fileId;
+      elements.contentAudio.dataset.fallbackUrl = normalizeDriveUrl(url, 'file');
+      elements.contentAudio.load();
+
+      if (fileId && state.contentAudioCache[fileId]) {
+        elements.contentAudio.src = state.contentAudioCache[fileId];
+        elements.contentAudio.load();
+      }
+    }
+
+    function playCurrentContentAudio() {
+      const audio = elements.contentAudio;
+      const fallbackUrl = audio.dataset.fallbackUrl || '';
+
+      elements.playContentAudioButton.disabled = true;
+      elements.playContentAudioButton.textContent = '🔊 กำลังโหลดเสียง...';
+
+      if (!audio.src && fallbackUrl) {
+        audio.src = fallbackUrl;
+        audio.load();
+      }
+
+      if (!audio.src) {
+        elements.playContentAudioButton.disabled = false;
+        elements.playContentAudioButton.textContent = '⚠️ ยังไม่มีไฟล์เสียง';
+        return;
+      }
+
+      audio.currentTime = 0;
+      const promise = audio.play();
+
+      if (promise && typeof promise.then === 'function') {
+        promise
+          .then(function() {
+            elements.playContentAudioButton.disabled = false;
+            elements.playContentAudioButton.textContent = '🔊 ฟังอีกครั้ง';
+          })
+          .catch(function(error) {
+            console.error(error);
+            elements.playContentAudioButton.disabled = false;
+            elements.playContentAudioButton.textContent = '⚠️ เปิดเสียงไม่สำเร็จ';
+          });
+      } else {
+        elements.playContentAudioButton.disabled = false;
+        elements.playContentAudioButton.textContent = '🔊 ฟังอีกครั้ง';
+      }
+    }
+
+    function scanNextContent() {
+      closeContentModal();
+      openScanner();
+    }
+
+    function closeContentModal() {
+      elements.contentAudio.pause();
+      elements.contentModal.classList.remove('show');
+      elements.contentModal.setAttribute('aria-hidden', 'true');
+    }
+
+    function logCurrentActivity(content) {
+      const user = state.currentUser || {};
+
+      apiRequest('logARActivity', {
+        displayName: user.displayName || '',
+        role: user.role || state.role || '',
+        contentId: content.id || '',
+        letter: content.letter || '',
+        word: content.word || '',
+        activityAction: 'SCAN_QR',
+        userAgent: navigator.userAgent
+      }).catch(function(error) {
+        console.warn('บันทึกกิจกรรมไม่สำเร็จ', error);
+      });
+    }
+
+    function extractDriveFileId(url) {
+      const value = String(url || '').trim();
+      const match =
+        value.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+        value.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      return match ? match[1] : '';
+    }
+
+    function cameraErrorMessage(error) {
+      const name = String(error && error.name || '');
+      if (name === 'NotAllowedError') {
+        return 'ยังไม่ได้อนุญาตใช้กล้อง กรุณาเปิดสิทธิ์กล้อง หรือกด “กรอกรหัส”';
+      }
+      if (name === 'NotFoundError') {
+        return 'ไม่พบกล้องในอุปกรณ์นี้ สามารถกรอกรหัส QR แทนได้';
+      }
+      return String(error && error.message || 'เปิดกล้องไม่สำเร็จ') + ' — สามารถกรอกรหัสแทนได้';
+    }
+
+    function normalizeDriveUrl(url, kind) {
+      const value = String(url || '').trim();
+      if (!value) return '';
+
+      const match =
+        value.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+        value.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+
+      if (!match) return value;
+
+      const id = match[1];
+
+      if (kind === 'image') {
+        return 'https://drive.google.com/thumbnail?id=' +
+          encodeURIComponent(id) +
+          '&sz=w2000';
+      }
+
+      return 'https://drive.usercontent.google.com/download?id=' +
+        encodeURIComponent(id) +
+        '&export=download&confirm=t';
+    }
+
+    function setSubmitting(isSubmitting) {
+      elements.startButton.disabled = isSubmitting;
+      elements.startButton.textContent = isSubmitting
+        ? 'กำลังเปิดประตู...'
+        : (state.settings.START_BUTTON_TEXT || 'เริ่มผจญภัย');
+    }
+
+    function showMessage(text, isSuccess) {
+      elements.message.textContent = text || '';
+      elements.message.classList.toggle('success', Boolean(isSuccess));
+    }
+
+    function hideLoading() {
+      if (elements.loading) elements.loading.classList.add('hidden');
+    }
+  </script>
+</body>
+</html>
