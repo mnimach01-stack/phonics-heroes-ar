@@ -1422,18 +1422,26 @@ apiRequest('bootstrap')
       MUSIC.backgroundMusic.dataset.fileId = MUSIC.fileId;
       MUSIC.backgroundMusic.dataset.fallbackUrl = MUSIC.fallbackUrl;
 
-      showMusicPrompt('🔊 แตะหน้าจอหนึ่งครั้งเพื่อเปิดเสียง');
+      showMusicPrompt('🔊 กำลังเตรียมเสียง...');
 
-      if (MUSIC.musicUnlocked) {
-        prepareBackgroundMusicData();
-      }
+      // โหลดเพลงล่วงหน้าตั้งแต่หน้าเว็บเปิด เพื่อให้ Safari เล่นได้ทันทีเมื่อผู้ใช้แตะ
+      prepareBackgroundMusicData();
     }
 
     function prepareBackgroundMusicData() {
       loadMusicSource(MUSIC.backgroundMusic, function() {
-        if (MUSIC.pendingMusicStart || MUSIC.musicUnlocked) {
-          MUSIC.pendingMusicStart = false;
-          playOpeningMusic();
+        if (!MUSIC.backgroundMusic || !MUSIC.backgroundMusic.src) {
+          showMusicPrompt('⚠️ โหลดเพลงไม่สำเร็จ');
+          return;
+        }
+
+        // Safari มักไม่อนุญาตให้ play() หลังการโหลดแบบ async
+        // จึงเตรียมไฟล์ไว้ก่อน แล้วให้ผู้ใช้แตะอีกครั้งเพื่อเริ่มเล่น
+        if (MUSIC.musicUnlocked && MUSIC.backgroundMusic.paused) {
+          showMusicPrompt('🔊 โหลดเสียงแล้ว แตะหน้าจออีกครั้งเพื่อเปิดเสียง');
+          reinstallMusicUnlock();
+        } else if (!MUSIC.musicUnlocked) {
+          showMusicPrompt('🔊 แตะหน้าจอหนึ่งครั้งเพื่อเปิดเสียง');
         }
       });
     }
@@ -1444,13 +1452,45 @@ apiRequest('bootstrap')
         return;
       }
 
+      const fileId = audioElement.dataset.fileId || '';
       const fallbackUrl = audioElement.dataset.fallbackUrl || '';
-      if (fallbackUrl) {
-        audioElement.src = fallbackUrl;
-        audioElement.load();
+
+      if (!fileId) {
+        if (fallbackUrl) {
+          audioElement.src = fallbackUrl;
+          audioElement.load();
+        }
+        if (onReady) onReady();
+        return;
       }
 
-      if (onReady) onReady();
+      if (MUSIC.mediaDataCache[fileId]) {
+        audioElement.src = MUSIC.mediaDataCache[fileId];
+        audioElement.load();
+        if (onReady) onReady();
+        return;
+      }
+
+      apiRequest('getMediaDataUrl', { fileId: fileId })
+        .then(function(response) {
+          if (response && response.success && response.dataUrl) {
+            MUSIC.mediaDataCache[fileId] = response.dataUrl;
+            audioElement.src = response.dataUrl;
+          } else if (fallbackUrl) {
+            audioElement.src = fallbackUrl;
+          }
+
+          audioElement.load();
+          if (onReady) onReady();
+        })
+        .catch(function(error) {
+          console.error('โหลดเพลงผ่าน API ไม่สำเร็จ', error);
+          if (fallbackUrl) {
+            audioElement.src = fallbackUrl;
+            audioElement.load();
+          }
+          if (onReady) onReady();
+        });
     }
 
     function installMusicUnlock() {
@@ -1877,40 +1917,84 @@ apiRequest('bootstrap')
 
     function playCurrentContentAudio() {
       const audio = elements.contentAudio;
+      const fileId = audio.dataset.fileId || '';
       const fallbackUrl = audio.dataset.fallbackUrl || '';
 
       elements.playContentAudioButton.disabled = true;
       elements.playContentAudioButton.textContent = '🔊 กำลังโหลดเสียง...';
 
-      if (!audio.src && fallbackUrl) {
-        audio.src = fallbackUrl;
-        audio.load();
-      }
+      const playReadyAudio = function() {
+        if (!audio.src) {
+          elements.playContentAudioButton.disabled = false;
+          elements.playContentAudioButton.textContent = '⚠️ ยังไม่มีไฟล์เสียง';
+          return;
+        }
 
-      if (!audio.src) {
-        elements.playContentAudioButton.disabled = false;
-        elements.playContentAudioButton.textContent = '⚠️ ยังไม่มีไฟล์เสียง';
+        audio.currentTime = 0;
+        const promise = audio.play();
+
+        if (promise && typeof promise.then === 'function') {
+          promise
+            .then(function() {
+              elements.playContentAudioButton.disabled = false;
+              elements.playContentAudioButton.textContent = '🔊 ฟังอีกครั้ง';
+            })
+            .catch(function(error) {
+              console.error(error);
+              elements.playContentAudioButton.disabled = false;
+              elements.playContentAudioButton.textContent = '🔊 โหลดแล้ว แตะอีกครั้งเพื่อฟัง';
+            });
+        } else {
+          elements.playContentAudioButton.disabled = false;
+          elements.playContentAudioButton.textContent = '🔊 ฟังอีกครั้ง';
+        }
+      };
+
+      if (fileId && state.contentAudioCache[fileId]) {
+        audio.src = state.contentAudioCache[fileId];
+        audio.load();
+        playReadyAudio();
         return;
       }
 
-      audio.currentTime = 0;
-      const promise = audio.play();
+      if (fileId) {
+        apiRequest('getMediaDataUrl', { fileId: fileId })
+          .then(function(response) {
+            if (response && response.success && response.dataUrl) {
+              state.contentAudioCache[fileId] = response.dataUrl;
+              audio.src = response.dataUrl;
+              audio.load();
+              playReadyAudio();
+              return;
+            }
 
-      if (promise && typeof promise.then === 'function') {
-        promise
-          .then(function() {
-            elements.playContentAudioButton.disabled = false;
-            elements.playContentAudioButton.textContent = '🔊 ฟังอีกครั้ง';
+            throw new Error((response && response.message) || 'โหลดไฟล์เสียงไม่สำเร็จ');
           })
           .catch(function(error) {
-            console.error(error);
+            console.error('โหลดเสียงคำศัพท์ผ่าน API ไม่สำเร็จ', error);
+
+            if (fallbackUrl) {
+              audio.src = fallbackUrl;
+              audio.load();
+              playReadyAudio();
+              return;
+            }
+
             elements.playContentAudioButton.disabled = false;
             elements.playContentAudioButton.textContent = '⚠️ เปิดเสียงไม่สำเร็จ';
           });
-      } else {
-        elements.playContentAudioButton.disabled = false;
-        elements.playContentAudioButton.textContent = '🔊 ฟังอีกครั้ง';
+        return;
       }
+
+      if (fallbackUrl) {
+        audio.src = fallbackUrl;
+        audio.load();
+        playReadyAudio();
+        return;
+      }
+
+      elements.playContentAudioButton.disabled = false;
+      elements.playContentAudioButton.textContent = '⚠️ ยังไม่มีไฟล์เสียง';
     }
 
     function scanNextContent() {
