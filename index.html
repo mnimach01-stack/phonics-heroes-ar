@@ -2171,12 +2171,10 @@ apiRequest('bootstrap')
             elements.contentModel.setAttribute('auto-rotate', '');
             elements.contentModel.setAttribute('rotation-per-second', '18deg');
             elements.contentModel.setAttribute('interaction-prompt', 'none');
-            elements.contentModel.setAttribute('crossorigin', 'anonymous');
             elements.contentModel.src = visualUrl;
             elements.contentModel.style.setProperty('--poster-color', 'transparent');
             elements.contentModel.classList.add('show');
           } else {
-            elements.contentImage.crossOrigin = 'anonymous';
             elements.contentImage.src = visualUrl;
             elements.contentImage.classList.add('show');
           }
@@ -2198,31 +2196,87 @@ apiRequest('bootstrap')
 
     async function loadVisualMediaUrl_(sourceUrl, fileType) {
       const fileId = extractDriveFileId(sourceUrl);
-      const cacheKey = (fileId || sourceUrl) + '|' + String(fileType || '').toUpperCase();
+      const normalizedType = String(fileType || '').toUpperCase();
+      const cacheKey = fileId || sourceUrl;
 
       if (state.visualMediaCache[cacheKey]) {
         return state.visualMediaCache[cacheKey];
       }
 
-      const type = String(fileType || '').toUpperCase();
-      const isModel = type === 'GLB' || type === 'GLTF';
-
-      // V11: โหลดภาพ/โมเดลจากลิงก์สาธารณะโดยตรง
-      // ไม่ส่ง GLB ผ่าน JSONP/Base64 เพราะไฟล์ใหญ่และทำให้ Apps Script ตอบกลับไม่สำเร็จ
-      let directUrl = sourceUrl;
-
-      if (fileId) {
-        directUrl = isModel
-          ? 'https://drive.usercontent.google.com/download?id=' +
-              encodeURIComponent(fileId) + '&export=download&confirm=t'
-          : 'https://drive.google.com/thumbnail?id=' +
-              encodeURIComponent(fileId) + '&sz=w2000';
-      } else {
-        directUrl = normalizeDriveUrl(sourceUrl, isModel ? 'file' : 'image');
+      if (!fileId) {
+        return normalizeDriveUrl(
+          sourceUrl,
+          (normalizedType === 'GLB' || normalizedType === 'GLTF') ? 'file' : 'image'
+        );
       }
 
-      state.visualMediaCache[cacheKey] = directUrl;
-      return directUrl;
+      // รูปภาพยังใช้ Data URL เดิม เพราะไฟล์เล็กและวิธีนี้ทำงานเสถียรบน iPhone
+      if (normalizedType !== 'GLB' && normalizedType !== 'GLTF') {
+        const response = await apiRequest('getMediaDataUrl', { fileId: fileId });
+        if (!response || !response.success || !response.dataUrl) {
+          throw new Error((response && response.message) || 'ไม่สามารถโหลดรูปภาพจาก Google Drive');
+        }
+
+        const imageObjectUrl = dataUrlToObjectUrl_(response.dataUrl);
+        state.visualMediaCache[cacheKey] = imageObjectUrl;
+        return imageObjectUrl;
+      }
+
+      // GLB โหลดแบบแบ่งชิ้น ป้องกัน JSONP ใหญ่เกินและหมดเวลา
+      const modelObjectUrl = await loadChunkedDriveBlobUrl_(fileId);
+      state.visualMediaCache[cacheKey] = modelObjectUrl;
+      return modelObjectUrl;
+    }
+
+    async function loadChunkedDriveBlobUrl_(fileId) {
+      const requestedChunkSize = 393216; // 384 KB ต่อคำขอ
+      const info = await apiRequest('getMediaInfo', {
+        fileId: fileId,
+        chunkSize: requestedChunkSize
+      });
+
+      if (!info || !info.success || !info.chunkCount) {
+        throw new Error((info && info.message) || 'อ่านข้อมูลโมเดลไม่สำเร็จ');
+      }
+
+      const parts = [];
+      const chunkCount = Number(info.chunkCount);
+      elements.contentDisplay.textContent =
+        (elements.contentDisplay.textContent || '') + ' • กำลังโหลดโมเดล 0/' + chunkCount;
+
+      for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex += 1) {
+        const response = await apiRequest('getMediaChunk', {
+          fileId: fileId,
+          chunkIndex: chunkIndex,
+          chunkSize: info.chunkSize || requestedChunkSize
+        });
+
+        if (!response || !response.success || !response.base64) {
+          throw new Error((response && response.message) || 'โหลดชิ้นส่วนโมเดลไม่สำเร็จ');
+        }
+
+        const binary = atob(response.base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index += 1) {
+          bytes[index] = binary.charCodeAt(index);
+        }
+        parts.push(bytes);
+
+        elements.contentDisplay.textContent =
+          String(state.currentContent && state.currentContent.displayText || '') +
+          ' • กำลังโหลดโมเดล ' + (chunkIndex + 1) + '/' + chunkCount;
+      }
+
+      const mimeType = info.mimeType && info.mimeType !== 'application/octet-stream'
+        ? info.mimeType
+        : 'model/gltf-binary';
+      const blob = new Blob(parts, { type: mimeType });
+
+      if (!blob.size) throw new Error('ประกอบไฟล์โมเดลไม่สำเร็จ');
+
+      elements.contentDisplay.textContent =
+        String(state.currentContent && state.currentContent.displayText || '');
+      return URL.createObjectURL(blob);
     }
 
     function dataUrlToObjectUrl_(dataUrl) {
