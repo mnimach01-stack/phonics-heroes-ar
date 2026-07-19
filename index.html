@@ -2171,10 +2171,12 @@ apiRequest('bootstrap')
             elements.contentModel.setAttribute('auto-rotate', '');
             elements.contentModel.setAttribute('rotation-per-second', '18deg');
             elements.contentModel.setAttribute('interaction-prompt', 'none');
+            elements.contentModel.setAttribute('crossorigin', 'anonymous');
             elements.contentModel.src = visualUrl;
             elements.contentModel.style.setProperty('--poster-color', 'transparent');
             elements.contentModel.classList.add('show');
           } else {
+            elements.contentImage.crossOrigin = 'anonymous';
             elements.contentImage.src = visualUrl;
             elements.contentImage.classList.add('show');
           }
@@ -2196,27 +2198,31 @@ apiRequest('bootstrap')
 
     async function loadVisualMediaUrl_(sourceUrl, fileType) {
       const fileId = extractDriveFileId(sourceUrl);
-      const cacheKey = fileId || sourceUrl;
+      const cacheKey = (fileId || sourceUrl) + '|' + String(fileType || '').toUpperCase();
 
       if (state.visualMediaCache[cacheKey]) {
         return state.visualMediaCache[cacheKey];
       }
 
-      if (!fileId) {
-        return normalizeDriveUrl(
-          sourceUrl,
-          (fileType === 'GLB' || fileType === 'GLTF') ? 'file' : 'image'
-        );
+      const type = String(fileType || '').toUpperCase();
+      const isModel = type === 'GLB' || type === 'GLTF';
+
+      // V11: โหลดภาพ/โมเดลจากลิงก์สาธารณะโดยตรง
+      // ไม่ส่ง GLB ผ่าน JSONP/Base64 เพราะไฟล์ใหญ่และทำให้ Apps Script ตอบกลับไม่สำเร็จ
+      let directUrl = sourceUrl;
+
+      if (fileId) {
+        directUrl = isModel
+          ? 'https://drive.usercontent.google.com/download?id=' +
+              encodeURIComponent(fileId) + '&export=download&confirm=t'
+          : 'https://drive.google.com/thumbnail?id=' +
+              encodeURIComponent(fileId) + '&sz=w2000';
+      } else {
+        directUrl = normalizeDriveUrl(sourceUrl, isModel ? 'file' : 'image');
       }
 
-      const response = await apiRequest('getMediaDataUrl', { fileId: fileId });
-      if (!response || !response.success || !response.dataUrl) {
-        throw new Error((response && response.message) || 'ไม่สามารถโหลดไฟล์จาก Google Drive');
-      }
-
-      const objectUrl = dataUrlToObjectUrl_(response.dataUrl);
-      state.visualMediaCache[cacheKey] = objectUrl;
-      return objectUrl;
+      state.visualMediaCache[cacheKey] = directUrl;
+      return directUrl;
     }
 
     function dataUrlToObjectUrl_(dataUrl) {
