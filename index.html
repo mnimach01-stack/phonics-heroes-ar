@@ -1416,7 +1416,7 @@ apiRequest('bootstrap')
       if (!MUSIC.backgroundMusic) return;
 
       MUSIC.backgroundMusic.loop = true;
-      MUSIC.backgroundMusic.volume = MUSIC.volume;
+      setBgmVolume(MUSIC.volume,400);
       MUSIC.backgroundMusic.preload = 'auto';
       MUSIC.backgroundMusic.muted = false;
       MUSIC.backgroundMusic.dataset.fileId = MUSIC.fileId;
@@ -1572,6 +1572,22 @@ apiRequest('bootstrap')
       document.addEventListener('keydown', retry, { once: true });
     }
 
+    
+    function setBgmVolume(target, duration) {
+      duration = duration || 500;
+      if (!MUSIC.backgroundMusic) return;
+      const audio = MUSIC.backgroundMusic;
+      const start = audio.volume;
+      const diff = target - start;
+      const startTime = performance.now();
+      function step(now){
+        const p = Math.min((now-startTime)/duration,1);
+        audio.volume = start + diff*p;
+        if(p<1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
     function createFireflies(count) {
       elements.fireflies.innerHTML = '';
 
@@ -1710,6 +1726,8 @@ apiRequest('bootstrap')
 
     /* ===== Camera + QR + AR Content V3.0 ===== */
     async function openScanner() {
+      setBgmVolume(0.20,500);
+
       closeContentModal();
       elements.manualBox.classList.remove('show');
       elements.scannerScreen.classList.add('show');
@@ -1775,6 +1793,8 @@ apiRequest('bootstrap')
     }
 
     function closeScanner() {
+      setBgmVolume(MUSIC.volume,500);
+
       stopScannerCamera();
       elements.scannerScreen.classList.remove('show');
       elements.scannerScreen.setAttribute('aria-hidden', 'true');
@@ -1916,6 +1936,8 @@ apiRequest('bootstrap')
     }
 
     function playCurrentContentAudio() {
+      setBgmVolume(0.03,300);
+
       const audio = elements.contentAudio;
       const fileId = audio.dataset.fileId || '';
       const fallbackUrl = audio.dataset.fallbackUrl || '';
